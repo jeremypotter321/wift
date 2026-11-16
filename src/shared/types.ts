@@ -1,4 +1,4 @@
-// Shopboard v2: Tekmetric-baseline shop management. One local shop, SQLite on disk.
+// WIFT (was Shopboard): Tekmetric-baseline shop management. One local shop, SQLite on disk.
 
 // ---------- repair order lifecycle ----------
 /** Estimate → Work in progress → Completed. Paid / A-R is derived from the balance once completed. */

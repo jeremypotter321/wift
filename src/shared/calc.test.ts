@@ -126,3 +126,15 @@ describe('verdict', () => {
     expect(verdict(b, s).level).toBe('Take')
   })
 })
+
+describe('effective $/hr while work is open', () => {
+  it('uses sold hours until clocked time passes them, then actual time once completed', () => {
+    const entry = (hours: number) => ({ id: 1, roId: 1, jobId: 1, userId: null, date: '', hours, note: '', timerStart: null })
+    const wip = roTotals(bundle({ ro: ro({ status: 'wip' }), jobs: [job(1, 'approved')], labor: [entry(0.5)] }), s)
+    expect(wip.effectiveHourly).toBe(165) // 330 / 2 sold, not 330 / 0.5
+    expect(wip.laborCost).toBe(130)
+    const done = roTotals(bundle({ ro: ro({ status: 'completed' }), jobs: [job(1, 'approved')], labor: [entry(1.5)] }), s)
+    expect(done.effectiveHourly).toBe(220) // beat book time: 330 / 1.5
+    expect(done.laborCost).toBe(97.5)
+  })
+})

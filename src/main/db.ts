@@ -76,7 +76,10 @@ function ensureColumns(d: Database) {
 export async function openDb(dataDir: string, wasmDir?: string): Promise<void> {
   SQL = await initSqlJs(wasmDir ? { locateFile: (f) => path.join(wasmDir, f) } : undefined)
   fs.mkdirSync(dataDir, { recursive: true })
-  dbFile = path.join(dataDir, 'shopboard.db')
+  dbFile = path.join(dataDir, 'wift.db')
+  // The app was called Shopboard before it became WIFT: carry an existing database over.
+  const legacy = path.join(dataDir, 'shopboard.db')
+  if (!fs.existsSync(dbFile) && fs.existsSync(legacy)) fs.renameSync(legacy, dbFile)
   if (fs.existsSync(dbFile)) {
     backup(dataDir)
     db = new SQL.Database(fs.readFileSync(dbFile))
@@ -96,7 +99,7 @@ function backup(dataDir: string) {
   const dir = path.join(dataDir, 'backups')
   fs.mkdirSync(dir, { recursive: true })
   const stamp = new Date().toISOString().replace(/[:.]/g, '-')
-  fs.copyFileSync(dbFile, path.join(dir, `shopboard-${stamp}.db`))
+  fs.copyFileSync(dbFile, path.join(dir, `wift-${stamp}.db`))
   const files = fs.readdirSync(dir).filter((f) => f.endsWith('.db')).sort()
   for (const f of files.slice(0, Math.max(0, files.length - KEEP_BACKUPS))) fs.rmSync(path.join(dir, f))
 }
@@ -131,7 +134,7 @@ export const dbPath = () => dbFile
 
 export async function restoreFrom(file: string, dataDir: string) {
   const candidate = new SQL.Database(fs.readFileSync(file))
-  candidate.exec('SELECT count(*) FROM settings') // throws if it isn't a Shopboard DB
+  candidate.exec('SELECT count(*) FROM settings') // throws if it isn't a WIFT database
   candidate.close()
   save()
   backup(dataDir)

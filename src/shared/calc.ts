@@ -105,17 +105,17 @@ export function roTotals(b: RoBundle, s: Settings, users: User[] = []): RoTotals
 
   const soldHours = round2(sum('labor', (l) => l.qty))
   const clockedHours = round2(b.labor.reduce((a, e) => a + (e.hours || 0), 0))
-  const hours = clockedHours > 0 ? clockedHours : soldHours
+  // Completed: actual clocked time (beating book time shows as a higher $/hr). Still open: the larger of sold and clocked,
+  // so a job that's only part-way clocked doesn't look like a windfall.
+  const hours = ro.status === 'completed' ? clockedHours || soldHours : Math.max(clockedHours, soldHours)
   const partsCost = round2(sum('part', lineCost))
   const subletCost = round2(sum('sublet', lineCost))
   const feesCost = round2(sum('fee', lineCost))
   // Labor cost: clocked time at each tech's cost; with nothing clocked, sold hours at the RO tech's cost.
   const userById = new Map(users.map((u) => [u.id, u]))
-  const laborCost = round2(
-    clockedHours > 0
-      ? b.labor.reduce((a, e) => a + e.hours * hourlyCost(s, e.userId ? userById.get(e.userId) : null), 0)
-      : soldHours * hourlyCost(s, ro.techId ? userById.get(ro.techId) : null),
-  )
+  const clockedCost = b.labor.reduce((a, e) => a + e.hours * hourlyCost(s, e.userId ? userById.get(e.userId) : null), 0)
+  const soldCost = soldHours * hourlyCost(s, ro.techId ? userById.get(ro.techId) : null)
+  const laborCost = round2(hours === clockedHours && clockedHours > 0 ? clockedCost : clockedHours > 0 && ro.status !== 'completed' ? Math.max(clockedCost, soldCost) : soldCost)
   const grossProfit = round2(subtotal - partsCost - subletCost - feesCost - laborCost)
   const afterParts = subtotal - partsCost - subletCost - feesCost
 

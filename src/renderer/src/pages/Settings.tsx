@@ -1,159 +1,280 @@
 import { useEffect, useState } from 'react'
 import { api } from '../api'
-import { useStore } from '../store'
-import { Field, fmtMoney, NumInput } from '../ui'
-import type { Settings } from '../../../shared/types'
+import { useData } from '../store'
+import { Avatar, confirmDialog, Field, fmtMoney, LazyInput, NumInput } from '../ui'
+import { matrixPrice } from '../../../shared/calc'
+import { ROLES, type InspectionTemplate, type MatrixTier, type Settings, type User } from '../../../shared/types'
 
 const SECTIONS = [
-  ['rates', 'Shop & rates'],
-  ['techs', 'Techs'],
-  ['verdict', 'Verdict'],
-  ['google', 'Google Sheets'],
-  ['data', 'Data & backup'],
+  ['shop', 'Shop info'], ['labor', 'Labor rates'], ['matrix', 'Pricing matrix'], ['fees', 'Supplies & fees'], ['tax', 'Taxes'],
+  ['users', 'Users & roles'], ['templates', 'Inspection templates'], ['verdict', 'Verdict & content'], ['google', 'Google Sheets'], ['data', 'Backup & data'],
 ] as const
+type Section = (typeof SECTIONS)[number][0]
+const COLORS = ['#1D4ED8', '#0F766E', '#6D28D9', '#B45309', '#B91C1C', '#334155']
 
 export function SettingsPage() {
-  const { data, act } = useStore()
-  const [s, setS] = useState<Settings | null>(data?.settings ?? null)
-  const [newTech, setNewTech] = useState('')
-  const [msg, setMsg] = useState('')
-  const [connecting, setConnecting] = useState(false)
-  useEffect(() => setS(data?.settings ?? null), [data?.settings])
-  if (!data || !s) return null
+  const { data, act, toast } = useData()
+  const [sec, setSec] = useState<Section>('shop')
+  const [s, setS] = useState<Settings>(data.settings)
+  useEffect(() => setS(data.settings), [data.settings])
   const dirty = JSON.stringify(s) !== JSON.stringify(data.settings)
   const set = (p: Partial<Settings>) => setS({ ...s, ...p })
-  const jump = (id: string) => document.getElementById(id)?.scrollIntoView({ behavior: 'smooth' })
+  const matrixError = checkMatrix(s.partsMatrix)
 
   return (
     <div className="page">
-      <div className="page-head">
-        <h1>Settings</h1>
-        <span className="grow" />
-        {dirty && <button className="btn" onClick={() => setS(data.settings)}>Discard</button>}
-        <button className="btn primary" disabled={!dirty} onClick={() => act(() => api.saveSettings(s))}>{dirty ? 'Save settings' : 'Saved'}</button>
-      </div>
-      {msg && <div className="okbar" style={{ marginBottom: 12 }} role="status">{msg}</div>}
+      <div className="page-head"><h1>Settings</h1></div>
       <div className="settings">
-        <nav className="section-nav" aria-label="Settings sections">
-          {SECTIONS.map(([id, label]) => <button key={id} className="nav-item" onClick={() => jump(id)}>{label}</button>)}
+        <nav className="section-nav card" style={{ padding: 6 }} aria-label="Settings sections">
+          {SECTIONS.map(([k, label]) => <button key={k} className={`sec-link ${sec === k ? 'on' : ''}`} onClick={() => setSec(k)}>{label}</button>)}
         </nav>
         <div className="stack">
-          <section className="card stack" id="rates">
-            <h2>Shop & rates</h2>
-            <Field label="Shop name"><input value={s.shopName} onChange={(e) => set({ shopName: e.target.value })} /></Field>
-            <div className="grid3">
-              <Field label="Labor rate you charge ($/hr)"><NumInput prefix="$" value={s.laborRate} onChange={(laborRate) => set({ laborRate })} /></Field>
-              <Field label="Tech cost ($/hr, wages + taxes)"><NumInput prefix="$" value={s.techCost} onChange={(techCost) => set({ techCost })} /></Field>
-              <Field label="Overhead ($/hr)"><NumInput prefix="$" value={s.overheadPerHour} onChange={(overheadPerHour) => set({ overheadPerHour })} /></Field>
-            </div>
-            <div className="grid3">
-              <Field label="Target effective $/hr"><NumInput prefix="$" value={s.targetHourly} onChange={(targetHourly) => set({ targetHourly })} /></Field>
-              <Field label="Parts markup (%)"><NumInput value={s.partsMarkupPct} onChange={(partsMarkupPct) => set({ partsMarkupPct })} /></Field>
-            </div>
-            <p className="small muted" style={{ margin: 0 }}>
-              <b>Overhead</b> = rent, insurance, utilities, tools and software for a month, divided by the hours you work in a month.
-              <b> Effective $/hr</b> = what the job brings in after parts cost, divided by hours worked. Shops usually aim for about 90% of their posted rate
-              ({fmtMoney(s.laborRate * 0.9)} at {fmtMoney(s.laborRate)}). Markup {s.partsMarkupPct}% means a $100 part is charged at {fmtMoney(100 * (1 + s.partsMarkupPct / 100))}.
-            </p>
-          </section>
-
-          <section className="card stack" id="techs">
-            <h2>Techs</h2>
-            <div className="row wrap">
-              {s.techs.map((t) => (
-                <span className="chip" key={t}>
-                  {t}
-                  <button aria-label={`Remove ${t}`} onClick={() => set({ techs: s.techs.filter((x) => x !== t) })}>×</button>
-                </span>
-              ))}
-            </div>
-            <div className="row">
-              <input style={{ width: 240 }} value={newTech} placeholder="Name" onChange={(e) => setNewTech(e.target.value)}
-                onKeyDown={(e) => { if (e.key === 'Enter' && newTech.trim()) { set({ techs: [...s.techs, newTech.trim()] }); setNewTech('') } }} />
-              <button className="btn" disabled={!newTech.trim() || s.techs.includes(newTech.trim())} onClick={() => { set({ techs: [...s.techs, newTech.trim()] }); setNewTech('') }}>Add tech</button>
-            </div>
-          </section>
-
-          <section className="card stack" id="verdict">
-            <h2>"Should I take it?" tuning</h2>
-            <div className="grid3">
-              <Field label="Maybe band (% under target)"><NumInput value={s.maybeBandPct} onChange={(maybeBandPct) => set({ maybeBandPct })} /></Field>
-              <Field label="Hours padding per risk (%)"><NumInput value={s.riskPenaltyPct} onChange={(riskPenaltyPct) => set({ riskPenaltyPct })} /></Field>
-              <Field label="Content score that raises a level"><NumInput value={s.contentBumpScore} step="1" onChange={(contentBumpScore) => set({ contentBumpScore })} /></Field>
-            </div>
-            <p className="small muted" style={{ margin: 0 }}>
-              Take: projected $/hr at or above {fmtMoney(s.targetHourly)}. Maybe: down to {fmtMoney(s.targetHourly * (1 - s.maybeBandPct / 100))}. Pass: below that, or the job loses money.
-              Each risk adds {s.riskPenaltyPct}% to the hours, and 3+ risks drop a level. A content score of {s.contentBumpScore}+ raises a level.
-            </p>
-          </section>
-
-          <section className="card stack" id="google">
-            <h2>Google Sheets</h2>
-            <p className="small muted" style={{ margin: 0 }}>
-              One-time setup: create a Google OAuth client (Desktop app) and paste it below. The steps are in <code>docs/GOOGLE_SETUP.md</code>.
-              Shopboard can only see the spreadsheet it creates, nothing else in your Drive.
-            </p>
-            <div className="grid2">
-              <Field label="Client ID"><input value={s.googleClientId} onChange={(e) => set({ googleClientId: e.target.value.trim() })} /></Field>
-              <Field label="Client secret"><input type="password" value={s.googleClientSecret} onChange={(e) => set({ googleClientSecret: e.target.value.trim() })} /></Field>
-            </div>
-            <div className="row wrap">
-              {data.googleConnected ? (
-                <>
-                  <span className="pill st-done">Connected</span>
-                  <button className="btn" onClick={() => act(() => api.googleDisconnect())}>Disconnect</button>
-                </>
-              ) : (
-                <>
-                  <span className="pill st-lead">Not connected</span>
-                  <button
-                    className="btn primary"
-                    disabled={connecting || dirty || !s.googleClientId || !s.googleClientSecret}
-                    title={dirty ? 'Save settings first' : undefined}
-                    onClick={async () => {
-                      setConnecting(true)
-                      setMsg('')
-                      const ok = await act(() => api.googleConnect())
-                      setConnecting(false)
-                      if (ok) setMsg('Connected to Google.')
-                    }}
-                  >
-                    {connecting ? 'Waiting for Google sign-in in your browser…' : 'Connect Google account'}
-                  </button>
-                </>
-              )}
-              {s.googleSpreadsheetId && (
-                <button className="btn" onClick={() => api.openLink(`https://docs.google.com/spreadsheets/d/${s.googleSpreadsheetId}/edit`)}>Open spreadsheet</button>
-              )}
-            </div>
-            {s.googleSpreadsheetId && (
-              <Field label="Spreadsheet ID (clear it to start a new spreadsheet on the next push)">
-                <input value={s.googleSpreadsheetId} onChange={(e) => set({ googleSpreadsheetId: e.target.value.trim() })} />
-              </Field>
-            )}
-          </section>
-
-          <section className="card stack" id="data">
-            <h2>Data & backup</h2>
-            <p className="small muted" style={{ margin: 0 }}>Everything is saved on this computer. A backup copy is made every time Shopboard opens (the last 15 are kept).</p>
-            <div className="row wrap">
-              <button className="btn" onClick={async () => { const f = await act(() => api.backupNow()); if (f) setMsg(`Backup saved to ${f}`) }}>Save a backup…</button>
-              <button className="btn" onClick={async () => {
-                if (!window.confirm('Restore replaces everything in Shopboard with the backup you pick. Your current data is backed up first. Continue?')) return
-                const ok = await act(() => api.restore())
-                if (ok) setMsg('Backup restored.')
-              }}>Restore from backup…</button>
-              <button className="btn" onClick={() => api.openDataFolder()}>Open data folder</button>
-            </div>
-            {data.jobs.length === 0 && (
-              <div className="row">
-                <button className="btn" onClick={() => act(() => api.loadSample())}>Load sample jobs</button>
-                <span className="small muted">Adds 9 example jobs so you can try things out. Delete them when you're done.</span>
+          {sec === 'shop' && (
+            <section className="card stack">
+              <h2>Shop info</h2>
+              <p className="small muted" style={{ margin: 0 }}>Printed at the top of estimates, invoices and inspection reports.</p>
+              <Field label="Shop name"><input value={s.shopName} onChange={(e) => set({ shopName: e.target.value })} /></Field>
+              <Field label="Address"><input value={s.shopAddress} onChange={(e) => set({ shopAddress: e.target.value })} /></Field>
+              <div className="grid2"><Field label="Phone"><input value={s.shopPhone} onChange={(e) => set({ shopPhone: e.target.value })} /></Field><Field label="Email"><input value={s.shopEmail} onChange={(e) => set({ shopEmail: e.target.value })} /></Field></div>
+              <Field label="Warranty / terms (printed at the bottom of documents)"><textarea value={s.invoiceTerms} onChange={(e) => set({ invoiceTerms: e.target.value })} /></Field>
+              <div className="grid3">
+                <Field label="Next RO number"><NumInput value={s.nextRoNumber} step="1" onChange={(nextRoNumber) => set({ nextRoNumber })} /></Field>
+                <Field label="Reminder after (months without a visit)"><NumInput value={s.reminderMonths} step="1" onChange={(reminderMonths) => set({ reminderMonths })} /></Field>
+                <Field label="Google review link (for QR cards)"><input value={s.reviewUrl} onChange={(e) => set({ reviewUrl: e.target.value })} placeholder="https://g.page/r/…" /></Field>
               </div>
-            )}
-          </section>
+            </section>
+          )}
+          {sec === 'labor' && (
+            <section className="card stack">
+              <h2>Labor rates</h2>
+              <table>
+                <thead><tr><th>Name</th><th className="n">Rate / hr</th><th>Default</th><th /></tr></thead>
+                <tbody>{s.laborRates.map((r, i) => (
+                  <tr key={r.id}>
+                    <td><input className="sm" value={r.name} onChange={(e) => set({ laborRates: s.laborRates.map((x, k) => (k === i ? { ...x, name: e.target.value } : x)) })} /></td>
+                    <td style={{ width: 140 }}><NumInput className="sm" prefix="$" value={r.rate} onChange={(rate) => set({ laborRates: s.laborRates.map((x, k) => (k === i ? { ...x, rate } : x)) })} /></td>
+                    <td><input type="radio" name="defrate" checked={s.defaultLaborRateId === r.id} onChange={() => set({ defaultLaborRateId: r.id })} aria-label={`Default ${r.name}`} /></td>
+                    <td className="n">{s.laborRates.length > 1 && <button className="btn ghost sm" onClick={() => set({ laborRates: s.laborRates.filter((_, k) => k !== i) })}>Remove</button>}</td>
+                  </tr>
+                ))}</tbody>
+              </table>
+              <button className="btn sm" style={{ alignSelf: 'flex-start' }} onClick={() => set({ laborRates: [...s.laborRates, { id: `r${Date.now()}`, name: 'New rate', rate: s.laborRates[0]?.rate ?? 140 }] })}>+ Add rate (e.g. Electrical, Euro specialty)</button>
+              <div className="grid3">
+                <Field label="Tech cost ($/hr, wages + taxes)"><NumInput prefix="$" value={s.techCost} onChange={(techCost) => set({ techCost })} /></Field>
+                <Field label="Overhead ($/hr)"><NumInput prefix="$" value={s.overheadPerHour} onChange={(overheadPerHour) => set({ overheadPerHour })} /></Field>
+                <Field label="Target effective $/hr"><NumInput prefix="$" value={s.targetHourly} onChange={(targetHourly) => set({ targetHourly })} /></Field>
+              </div>
+              <p className="small muted" style={{ margin: 0 }}><b>Overhead</b> = a month of rent, insurance, utilities, tools and software ÷ hours worked in a month. <b>Effective $/hr</b> = what a job brings in after parts ÷ hours. Shops aim for about 90% of the posted rate ({fmtMoney((s.laborRates[0]?.rate ?? 0) * 0.9, false)}).</p>
+            </section>
+          )}
+          {sec === 'matrix' && (
+            <section className="card stack">
+              <h2>Parts pricing matrix</h2>
+              <p className="small muted" style={{ margin: 0 }}>Markup falls as part cost rises. Applied when a part is added to an RO; any line can be overridden by hand.</p>
+              <table>
+                <thead><tr><th>Cost from</th><th>Cost up to</th><th className="n">Markup %</th><th className="n">Multiplier</th><th className="n">Gross profit</th><th>Example</th><th /></tr></thead>
+                <tbody>{s.partsMatrix.map((t, i) => {
+                  const from = i === 0 ? 0 : s.partsMatrix[i - 1].upTo ?? 0
+                  const example = t.upTo ? Math.round((from + t.upTo) / 2) : Math.round(from * 1.5) || 100
+                  return (
+                    <tr key={i}>
+                      <td className="num">{fmtMoney(from, false)}</td>
+                      <td style={{ width: 140 }}>{t.upTo == null ? <span className="muted">and above</span> : <NumInput className="sm" prefix="$" value={t.upTo} onChange={(upTo) => set({ partsMatrix: s.partsMatrix.map((x, k) => (k === i ? { ...x, upTo } : x)) })} />}</td>
+                      <td style={{ width: 110 }}><NumInput className="sm" value={t.markupPct} onChange={(markupPct) => set({ partsMatrix: s.partsMatrix.map((x, k) => (k === i ? { ...x, markupPct } : x)) })} /></td>
+                      <td className="n num">×{(1 + t.markupPct / 100).toFixed(2)}</td>
+                      <td className="n num">{Math.round((t.markupPct / (100 + t.markupPct)) * 100)}%</td>
+                      <td className="small muted">${example} part sells for {fmtMoney(example * (1 + t.markupPct / 100))}</td>
+                      <td className="n">{t.upTo != null && s.partsMatrix.length > 1 && <button className="btn ghost sm" onClick={() => set({ partsMatrix: s.partsMatrix.filter((_, k) => k !== i) })}>Remove</button>}</td>
+                    </tr>
+                  )
+                })}</tbody>
+              </table>
+              {matrixError && <div className="neg small">{matrixError}</div>}
+              <button className="btn sm" style={{ alignSelf: 'flex-start' }} onClick={() => {
+                const tiers = [...s.partsMatrix]
+                const last = tiers.pop()!
+                const prev = tiers.at(-1)?.upTo ?? 0
+                set({ partsMatrix: [...tiers, { upTo: prev + 100, markupPct: last.markupPct + 10 }, last] })
+              }}>+ Add tier</button>
+              <TestCost settings={s} />
+            </section>
+          )}
+          {sec === 'fees' && (
+            <section className="card stack">
+              <h2>Shop supplies & fees</h2>
+              <div className="grid2">
+                <Field label="Shop supplies (% of labor)"><NumInput value={s.shopSuppliesPct} onChange={(shopSuppliesPct) => set({ shopSuppliesPct })} /></Field>
+                <Field label="Cap per RO ($, 0 = no cap)"><NumInput prefix="$" value={s.shopSuppliesCap} onChange={(shopSuppliesCap) => set({ shopSuppliesCap })} /></Field>
+              </div>
+              <h3>Fee presets</h3>
+              <table><thead><tr><th>Fee</th><th className="n">Amount</th><th>Taxable</th><th /></tr></thead>
+                <tbody>{s.feePresets.map((f, i) => (
+                  <tr key={f.id}>
+                    <td><input className="sm" value={f.name} onChange={(e) => set({ feePresets: s.feePresets.map((x, k) => (k === i ? { ...x, name: e.target.value } : x)) })} /></td>
+                    <td style={{ width: 120 }}><NumInput className="sm" prefix="$" value={f.amount} onChange={(amount) => set({ feePresets: s.feePresets.map((x, k) => (k === i ? { ...x, amount } : x)) })} /></td>
+                    <td><input type="checkbox" checked={f.taxable} onChange={(e) => set({ feePresets: s.feePresets.map((x, k) => (k === i ? { ...x, taxable: e.target.checked } : x)) })} aria-label="Taxable" /></td>
+                    <td className="n"><button className="btn ghost sm" onClick={() => set({ feePresets: s.feePresets.filter((_, k) => k !== i) })}>Remove</button></td>
+                  </tr>
+                ))}</tbody></table>
+              <button className="btn sm" style={{ alignSelf: 'flex-start' }} onClick={() => set({ feePresets: [...s.feePresets, { id: `f${Date.now()}`, name: 'New fee', amount: 0, taxable: false }] })}>+ Add fee</button>
+              <p className="small muted" style={{ margin: 0 }}>"+ Fee" on an RO job adds the first preset; rename or reprice it on the line.</p>
+            </section>
+          )}
+          {sec === 'tax' && (
+            <section className="card stack">
+              <h2>Sales tax</h2>
+              <div className="grid3">
+                <Field label="Parts & sublet (%)"><NumInput value={s.partsTaxPct} onChange={(partsTaxPct) => set({ partsTaxPct })} /></Field>
+                <Field label="Labor (%)"><NumInput value={s.laborTaxPct} onChange={(laborTaxPct) => set({ laborTaxPct })} /></Field>
+                <Field label="Fees & shop supplies (%)"><NumInput value={s.feesTaxPct} onChange={(feesTaxPct) => set({ feesTaxPct })} /></Field>
+              </div>
+              <p className="small muted" style={{ margin: 0 }}>Rules differ by state: parts are usually taxed, labor often isn't. Check with your accountant. Individual lines can be marked not taxable, and tax-exempt customers are never charged.</p>
+            </section>
+          )}
+          {sec === 'users' && <UsersSection />}
+          {sec === 'templates' && <TemplatesSection />}
+          {sec === 'verdict' && (
+            <section className="card stack">
+              <h2>"Should I take it?" tuning</h2>
+              <div className="grid3">
+                <Field label="Maybe band (% under target)"><NumInput value={s.maybeBandPct} onChange={(maybeBandPct) => set({ maybeBandPct })} /></Field>
+                <Field label="Hours padding per risk (%)"><NumInput value={s.riskPenaltyPct} onChange={(riskPenaltyPct) => set({ riskPenaltyPct })} /></Field>
+                <Field label="Content score that raises a level"><NumInput value={s.contentBumpScore} step="1" onChange={(contentBumpScore) => set({ contentBumpScore })} /></Field>
+              </div>
+              <p className="small muted" style={{ margin: 0 }}>Take: projected $/hr at or above {fmtMoney(s.targetHourly, false)}. Maybe: down to {fmtMoney(s.targetHourly * (1 - s.maybeBandPct / 100), false)}. Pass: below that, or the job loses money. Each risk adds {s.riskPenaltyPct}% to the hours; 3+ risks drop a level; a content score of {s.contentBumpScore}+ raises a level.</p>
+            </section>
+          )}
+          {sec === 'google' && <GoogleSection s={s} set={set} dirty={dirty} />}
+          {sec === 'data' && (
+            <section className="card stack">
+              <h2>Backup & data</h2>
+              <p className="small muted" style={{ margin: 0 }}>Everything is stored on this computer. A backup copy is made every time the app opens (the last 15 are kept).</p>
+              <div className="row wrap">
+                <button className="btn" onClick={async () => { const f = await act(() => api.backupNow()); if (f) toast(`Backup saved to ${f}`) }}>Save a backup…</button>
+                <button className="btn" onClick={async () => { if (await confirmDialog('Restore replaces everything with the backup you pick. Your current data is backed up first.', 'Choose backup')) { const ok = await act(() => api.restore()); if (ok) toast('Backup restored') } }}>Restore from backup…</button>
+                <button className="btn" onClick={() => api.openDataFolder()}>Open data folder</button>
+              </div>
+              {data.ros.length === 0 && <div className="row"><button className="btn" onClick={() => act(() => api.loadSample())}>Load sample shop data</button><span className="small muted">Adds example customers, cars and repair orders to try things out.</span></div>}
+            </section>
+          )}
+          {['shop', 'labor', 'matrix', 'fees', 'tax', 'verdict', 'google'].includes(sec) && (
+            <div className="savebar">
+              {dirty && <span className="small muted" style={{ marginRight: 'auto', alignSelf: 'center' }}>Unsaved changes</span>}
+              <button className="btn" disabled={!dirty} onClick={() => setS(data.settings)}>Discard</button>
+              <button className="btn primary" disabled={!dirty || !!matrixError} onClick={async () => { await act(() => api.saveSettings(s)); toast('Settings saved') }}>Save settings</button>
+            </div>
+          )}
         </div>
       </div>
     </div>
+  )
+}
+
+function checkMatrix(tiers: MatrixTier[]): string {
+  if (!tiers.length) return 'Add at least one tier.'
+  if (tiers.at(-1)!.upTo != null) return 'The last tier must be open-ended ("and above").'
+  for (let i = 1; i < tiers.length - 1; i++) if ((tiers[i].upTo ?? 0) <= (tiers[i - 1].upTo ?? 0)) return `Tier ${i + 1} must end above $${tiers[i - 1].upTo}.`
+  if (tiers.some((t) => t.markupPct < 0)) return 'Markups can’t be negative.'
+  return ''
+}
+function TestCost({ settings }: { settings: Settings }) {
+  const [c, setC] = useState(42)
+  return <div className="row"><span className="small strong">Test a cost:</span><div style={{ width: 120 }}><NumInput className="sm" prefix="$" value={c} onChange={setC} /></div><span className="small">sells for <b>{fmtMoney(matrixPrice(c, settings))}</b></span></div>
+}
+
+function UsersSection() {
+  const { data, act, user: me } = useData()
+  const save = (u: Partial<User> & { id?: number }) => act(() => api.save('users', u))
+  return (
+    <section className="card stack">
+      <h2>Users & roles</h2>
+      <table>
+        <thead><tr><th /><th>Name</th><th>Role</th><th>PIN</th><th className="n">Own cost $/hr</th><th>Active</th></tr></thead>
+        <tbody>{data.users.map((u) => (
+          <tr key={u.id}>
+            <td style={{ width: 40 }}><button className="btn ghost sm icon" aria-label="Change colour" onClick={() => save({ id: u.id, color: COLORS[(COLORS.indexOf(u.color) + 1) % COLORS.length] })}><Avatar u={u} sm /></button></td>
+            <td><LazyInput className="sm" value={u.name} onCommit={(name) => save({ id: u.id, name })} /></td>
+            <td style={{ width: 130 }}><select className="sm" value={u.role} disabled={u.id === me?.id} onChange={(e) => save({ id: u.id, role: e.target.value as User['role'] })}>{ROLES.map((r) => <option key={r} value={r}>{r[0].toUpperCase() + r.slice(1)}</option>)}</select></td>
+            <td style={{ width: 120 }}><LazyInput className="sm" type="password" value={u.pin} placeholder="none" aria-label="PIN (4–6 digits)" onCommit={(pin) => /^\d{0,6}$/.test(pin) && save({ id: u.id, pin })} /></td>
+            <td style={{ width: 120 }}><NumInput className="sm" prefix="$" value={u.hourlyCost} onChange={(hourlyCost) => save({ id: u.id, hourlyCost })} /></td>
+            <td><input type="checkbox" checked={u.active} disabled={u.id === me?.id} onChange={(e) => save({ id: u.id, active: e.target.checked })} aria-label="Active" /></td>
+          </tr>
+        ))}</tbody>
+      </table>
+      <button className="btn sm" style={{ alignSelf: 'flex-start' }} onClick={() => save({ name: 'New tech', role: 'tech', color: COLORS[data.users.length % COLORS.length] })}>+ Add user</button>
+      <div className="small muted stack tight">
+        <span><b>Owner:</b> everything, including Settings, profit reports and the accountant export.</span>
+        <span><b>Advisor:</b> everything except Settings and profit reports.</span>
+        <span><b>Tech:</b> job board, inspections and clocks. No prices, costs or profit.</span>
+        <span>PINs are 4–6 digits and are asked when switching user or punching the time clock. Leave blank for no PIN. "Own cost" overrides the shop's tech cost for that person (0 = use the shop default).</span>
+      </div>
+    </section>
+  )
+}
+
+function TemplatesSection() {
+  const { data, act } = useData()
+  const [selId, setSelId] = useState<number | null>(data.templates[0]?.id ?? null)
+  const t = data.templates.find((x) => x.id === selId)
+  const [text, setText] = useState('')
+  const toText = (x: InspectionTemplate) => {
+    let out = ''
+    let sec = ''
+    for (const it of x.items) {
+      if (it.section !== sec) { out += `${out ? '\n' : ''}# ${it.section}\n`; sec = it.section }
+      out += `${it.name}\n`
+    }
+    return out
+  }
+  useEffect(() => setText(t ? toText(t) : ''), [t])
+  const parse = (src: string) => {
+    let sec = 'General'
+    return src.split('\n').map((l) => l.trim()).filter(Boolean).flatMap((l) => (l.startsWith('#') ? ((sec = l.replace(/^#+\s*/, '')), []) : [{ section: sec, name: l }]))
+  }
+  return (
+    <section className="card stack">
+      <h2>Inspection templates</h2>
+      <div className="row wrap">
+        {data.templates.map((x) => <button key={x.id} className={`btn sm ${x.id === selId ? 'primary' : ''}`} onClick={() => setSelId(x.id)}>{x.name}</button>)}
+        <button className="btn sm" onClick={async () => { const n = await act(() => api.save('templates', { name: 'New template', items: [{ section: 'General', name: 'First item' }] })); if (n) setSelId(n.id) }}>+ New template</button>
+      </div>
+      {t && (
+        <>
+          <Field label="Name"><LazyInput value={t.name} onCommit={(name) => act(() => api.save('templates', { id: t.id, name }))} /></Field>
+          <Field label="Items: one per line. Start a line with # to begin a section."><textarea style={{ minHeight: 340, fontFamily: 'var(--mono)', fontSize: 13 }} value={text} onChange={(e) => setText(e.target.value)} /></Field>
+          <div className="row">
+            <button className="btn primary" disabled={text === toText(t)} onClick={() => act(() => api.save('templates', { id: t.id, items: parse(text) }))}>Save template ({parse(text).length} items)</button>
+            <button className="btn danger" onClick={async () => { if (await confirmDialog(`Delete the template "${t.name}"? Past inspections keep their items.`)) { await act(() => api.remove('templates', t.id)); setSelId(null) } }}>Delete</button>
+          </div>
+        </>
+      )}
+    </section>
+  )
+}
+
+function GoogleSection({ s, set, dirty }: { s: Settings; set: (p: Partial<Settings>) => void; dirty: boolean }) {
+  const { data, act, toast } = useData()
+  const [connecting, setConnecting] = useState(false)
+  return (
+    <section className="card stack">
+      <h2>Google Sheets</h2>
+      <p className="small muted" style={{ margin: 0 }}>One-time setup: create a Google OAuth client (Desktop app) and paste it here. Steps are in <code>docs/GOOGLE_SETUP.md</code>. The app can only see the spreadsheet it creates.</p>
+      <div className="grid2">
+        <Field label="Client ID"><input value={s.googleClientId} onChange={(e) => set({ googleClientId: e.target.value.trim() })} /></Field>
+        <Field label="Client secret"><input type="password" value={s.googleClientSecret} onChange={(e) => set({ googleClientSecret: e.target.value.trim() })} /></Field>
+      </div>
+      <div className="row wrap">
+        {data.googleConnected ? (
+          <><span className="pill p-green">Connected</span><button className="btn" onClick={() => act(() => api.googleDisconnect())}>Disconnect</button></>
+        ) : (
+          <><span className="pill p-slate">Not connected</span>
+            <button className="btn primary" disabled={connecting || dirty || !s.googleClientId || !s.googleClientSecret} title={dirty ? 'Save settings first' : undefined}
+              onClick={async () => { setConnecting(true); const ok = await act(() => api.googleConnect()); setConnecting(false); if (ok) toast('Connected to Google') }}>
+              {connecting ? 'Waiting for Google sign-in in your browser…' : 'Connect Google account'}</button></>
+        )}
+        {s.googleSpreadsheetId && <button className="btn" onClick={() => api.openLink(`https://docs.google.com/spreadsheets/d/${s.googleSpreadsheetId}/edit`)}>Open spreadsheet</button>}
+      </div>
+      {s.googleSpreadsheetId && <Field label="Spreadsheet ID (clear it to start a new spreadsheet on the next push)"><input value={s.googleSpreadsheetId} onChange={(e) => set({ googleSpreadsheetId: e.target.value.trim() })} /></Field>}
+    </section>
   )
 }

@@ -1,8 +1,8 @@
 {
   "name": "shopboard",
-  "productName": "Shopboard",
+  "productName": "WIFT",
   "version": "0.1.0",
-  "description": "Job tracker for a mechanic shop: labor, profit, effective hourly, take-it verdict, content score, Sheets export",
+  "description": "WIFT: shop management for a German-car repair shop (repair orders, inspections, scheduling, inventory, reports, Google Sheets export)",
   "main": "out/main/index.js",
   "private": true,
   "scripts": {
@@ -14,8 +14,8 @@
     "dist": "electron-vite build && electron-builder --mac --win"
   },
   "build": {
-    "appId": "com.shopboard.app",
-    "productName": "Shopboard",
+    "appId": "com.wift.app",
+    "productName": "WIFT",
     "directories": {
       "output": "dist"
     },

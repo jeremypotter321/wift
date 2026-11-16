@@ -14,7 +14,7 @@ const NUMFMT: Record<Table['formats'][number], string | undefined> = {
 
 export async function writeXlsx(report: Report, file: string, shopName: string): Promise<void> {
   const wb = new ExcelJS.Workbook()
-  wb.creator = 'Shopboard'
+  wb.creator = 'WIFT'
   wb.title = `${shopName} accounting ${report.from || 'start'} to ${report.to || 'today'}`
   for (const t of report.tables) {
     const ws = wb.addWorksheet(t.name, { views: [{ state: 'frozen', ySplit: 1 }] })

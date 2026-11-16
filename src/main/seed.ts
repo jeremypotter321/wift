@@ -17,6 +17,13 @@ const COURTESY: TemplateItem[] = [
   ...sec('Underbody', ['Exhaust / mounts', 'Transmission leaks', 'Differential / transfer case', 'Driveshaft / flex disc']),
   ...sec('Lights & electrical', ['Headlights', 'Brake / tail lights', 'Turn signals', 'Wipers / washers', 'Warning lights / stored fault codes']),
 ]
+/** The four N54 failures the shop is named for (Water pump, Injectors, Fuel pump, Turbo) plus its other usual suspects. */
+const N54: TemplateItem[] = [
+  ...sec('N54: WIFT checks', ['Electric water pump (run test, fault codes)', 'Thermostat / coolant temp vs target', 'Injectors (misfire counters, leak-down, index)',
+    'High-pressure fuel pump (rail pressure, long crank, limp mode)', 'Low-pressure fuel pump (in-tank)', 'Turbos: wastegate rattle, shaft play, oil seepage', 'Boost leaks / charge pipe (plastic, cracks)',
+    'Diverter valves', 'Intake valve carbon buildup (scope)', 'Coil packs / plugs (gap, wear)']),
+  ...COURTESY,
+]
 const PREPURCHASE: TemplateItem[] = [
   ...COURTESY,
   ...sec('Pre-purchase extras', ['Road test', 'Cold start / timing chain noise', 'Fault code scan (all modules)', 'Service history / records', 'Body / paint / rust', 'Frame / prior accident signs']),
@@ -32,6 +39,19 @@ const CANNED: { name: string; category: string; months: number; miles: number; l
     lines: [L('labor', 'Pressure bleed brake system', 0.8), L('part', 'DOT 4 low-viscosity brake fluid (1 L)', 1, 22)] },
   { name: 'Coolant flush (OE coolant)', category: 'Maintenance', months: 48, miles: 0,
     lines: [L('labor', 'Drain, fill and vacuum-bleed cooling system', 1.2), L('part', 'OE-spec coolant (gal)', 2, 38)] },
+  // BMW N54 (the shop's specialty): the four failures in the name, plus the usual N54 follow-ups. Book hours are starting points; adjust to your own times.
+  { name: 'N54 electric water pump + thermostat', category: 'N54 (WIFT)', months: 0, miles: 0,
+    lines: [L('labor', 'Replace electric water pump and thermostat, bleed cooling system', 2.8), L('part', 'Electric water pump (N54)', 1, 520), L('part', 'Thermostat (N54)', 1, 95), L('part', 'OE-spec coolant (gal)', 2, 38)] },
+  { name: 'N54 fuel injectors (index 12, set of 6)', category: 'N54 (WIFT)', months: 0, miles: 0,
+    lines: [L('labor', 'Replace 6 piezo injectors, new seals, code injector correction values', 2.6), L('part', 'Piezo injector, latest index (each)', 6, 255), L('part', 'Injector seal / Teflon ring kit', 1, 40)] },
+  { name: 'N54 high-pressure fuel pump (HPFP)', category: 'N54 (WIFT)', months: 0, miles: 0,
+    lines: [L('labor', 'Replace HPFP, check rail pressure, clear adaptations', 2), L('part', 'High-pressure fuel pump (latest revision)', 1, 760), L('part', 'HPFP line + O-ring kit', 1, 35)] },
+  { name: 'N54 turbos (pair) + wastegates', category: 'N54 (WIFT)', months: 0, miles: 0,
+    lines: [L('labor', 'Remove/replace twin turbos, new oil + coolant lines, gaskets', 14), L('part', 'Turbocharger (front + rear)', 2, 1150), L('part', 'Turbo install kit (gaskets, oil + coolant lines)', 1, 280)] },
+  { name: 'N54 spark plugs (one step colder)', category: 'N54 (WIFT)', months: 0, miles: 30000,
+    lines: [L('labor', 'Replace spark plugs, gap check', 1), L('part', 'Spark plug, one step colder (each)', 6, 18)] },
+  { name: 'N54 walnut blast intake valves', category: 'N54 (WIFT)', months: 0, miles: 0,
+    lines: [L('labor', 'Remove intake, walnut blast valves, reinstall', 4.5), L('part', 'Intake manifold gasket set', 1, 45), L('part', 'Walnut media', 1, 15)] },
   { name: 'Spark plugs', category: 'Maintenance', months: 0, miles: 60000, lines: [L('labor', 'Replace spark plugs', 1.5), L('part', 'Spark plug', 6, 14)] },
   { name: 'Dual-clutch (DSG) fluid service', category: 'Maintenance', months: 0, miles: 40000,
     lines: [L('labor', 'DSG fluid and filter service', 1.5), L('part', 'DSG fluid + filter kit', 1, 120)] },
@@ -47,6 +67,7 @@ export function ensureDefaults() {
   db.batch(() => {
     if (!db.list('templates').length) {
       db.insert('templates', { name: 'Courtesy inspection', items: COURTESY })
+      db.insert('templates', { name: 'BMW N54 (WIFT) inspection', items: N54 })
       db.insert('templates', { name: 'Pre-purchase inspection', items: PREPURCHASE })
     }
     if (!db.list('cannedJobs').length) {
@@ -85,9 +106,9 @@ export function loadSample() {
     ]
 
     const people: [string, string, string, Partial<Record<'year' | 'make' | 'model' | 'engine' | 'vin' | 'plate' | 'color', string>> & { mileage: number }][] = [
-      ['Dale Hendricks', '555-0101', 'dale@example.com', { year: '2017', make: 'BMW', model: '340i', engine: 'B58 3.0L I6 turbo', plate: 'DHB 340', color: 'Alpine White', mileage: 78400 }],
+      ['Dale Hendricks', '555-0101', 'dale@example.com', { year: '2010', make: 'BMW', model: '335i', engine: 'N54 3.0L twin-turbo I6', plate: 'DHB 335', color: 'Alpine White', mileage: 112400 }],
       ['Marcus Lee', '555-0102', 'marcus@example.com', { year: '1987', make: 'Porsche', model: '911 Carrera', engine: '3.2L flat-6', plate: 'ML 911', color: 'Guards Red', mileage: 121300 }],
-      ['Priya Shah', '555-0103', 'priya@example.com', { year: '2011', make: 'Volkswagen', model: 'GTI', engine: 'EA888 2.0T', plate: 'PRS 2011', color: 'Candy White', mileage: 132800 }],
+      ['Priya Shah', '555-0103', 'priya@example.com', { year: '2009', make: 'BMW', model: '135i', engine: 'N54 3.0L twin-turbo I6', plate: 'PRS 135', color: 'Le Mans Blue', mileage: 98800 }],
       ['Tom Becker', '555-0104', 'tom@example.com', { year: '2019', make: 'Audi', model: 'S4', engine: '3.0T V6', plate: 'TB S4', color: 'Navarra Blue', mileage: 54100 }],
       ['Angela Ruiz', '555-0105', 'angela@example.com', { year: '2015', make: 'Mercedes-Benz', model: 'E350', engine: 'M276 3.5L V6', plate: 'AR E350', color: 'Obsidian Black', mileage: 98200 }],
       ['Kevin O\'Neil', '555-0106', 'kevin@example.com', { year: '2008', make: 'BMW', model: 'M3', engine: 'S65 4.0L V8', plate: 'KO E92', color: 'Jerez Black', mileage: 88700 }],
@@ -139,10 +160,11 @@ export function loadSample() {
         { title: 'Upgraded chain tensioners', status: 'approved', lines: [['labor', 'Install pressure-fed tensioner upgrade', 3, 0], ['part', 'Tensioner upgrade kit', 1, 390]] },
         { title: 'Clutch kit while engine out', status: 'pending', lines: [['labor', 'Replace clutch (engine already out)', 1.5, 0], ['part', 'Clutch kit', 1, 520]] },
       ], clock: [[6, 7], [5, 7.5], [3, 6]] })
-    const r3 = mk(2, { status: 'wip', stage: 'In progress', created: 1, concern: 'Coolant smell, low coolant warning', promised: 0, risk: ['electrical'],
+    const r3 = mk(2, { status: 'wip', stage: 'In progress', created: 1, concern: 'Coolant warning, fan running hard, cyl 4 misfire at cold start', promised: 0, risk: ['electrical'],
       jobs: [
         { title: 'Diagnostic (first hour)', status: 'approved', lines: [['labor', 'Pressure test cooling system', 1, 160]] },
-        { title: 'Water pump / thermostat housing', status: 'approved', lines: [['labor', 'Replace water pump and thermostat housing', 3.2, 0], ['part', 'Water pump + thermostat housing kit', 1, 210], ['part', 'OE-spec coolant (gal)', 2, 38]] },
+        { title: 'N54 electric water pump + thermostat', status: 'approved', lines: [['labor', 'Replace electric water pump and thermostat, bleed cooling system', 2.8, 0], ['part', 'Electric water pump (N54)', 1, 520], ['part', 'Thermostat (N54)', 1, 95], ['part', 'OE-spec coolant (gal)', 2, 38]] },
+        { title: 'N54 fuel injectors (index 12, set of 6)', status: 'pending', lines: [['labor', 'Replace 6 piezo injectors, code correction values', 2.6, 0], ['part', 'Piezo injector, latest index (each)', 6, 255]] },
       ], clock: [[1, 1.2]] })
     mk(3, { status: 'estimate', stage: 'Waiting on customer', created: 0, concern: 'Wants maintenance + tune', content: { transformation: 1, trend: 2 },
       jobs: [
@@ -168,12 +190,13 @@ export function loadSample() {
     pay(r2.id, 1500, 'Transfer', 6) // deposit
 
     // Inspection on the GTI
-    const tpl = db.list('templates')[0]
+    const tpl = db.list('templates').find((t) => t.name.startsWith('BMW N54')) ?? db.list('templates')[0]
     const insp = ops.startInspection(r3.id, tpl.id, luis.id)
     const items = db.list('inspectionItems', 'inspection_id = ?', [insp.id])
     items.forEach((it, i) => {
-      const rating = it.name.startsWith('Water pump') ? 'now' : it.name.startsWith('Valve cover') || it.name.startsWith('Rear pads') ? 'soon' : i < 30 ? 'good' : ''
-      db.update('inspectionItems', it.id, { rating, note: rating === 'now' ? 'Seeping at housing seam, crust on block' : rating === 'soon' ? 'Light seepage' : '' })
+      const rating = it.name.startsWith('Electric water pump') ? 'now' : it.name.startsWith('Injectors') || it.name.startsWith('Valve cover') ? 'soon' : i < 34 ? 'good' : ''
+      const note = it.name.startsWith('Electric water pump') ? 'Pump fault code 2E81, runs at reduced speed. Replace.' : it.name.startsWith('Injectors') ? 'Cyl 4 misfire counter climbing cold; injector is index 9. Recommend set of index 12.' : rating === 'soon' ? 'Light seepage' : ''
+      db.update('inspectionItems', it.id, { rating, note })
     })
 
     // Appointments this week

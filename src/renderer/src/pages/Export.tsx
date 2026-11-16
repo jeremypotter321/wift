@@ -32,11 +32,11 @@ export function ExportPage() {
   const [busy, setBusy] = useState('')
   const [done, setDone] = useState<{ text: string; url?: string } | null>(null)
 
-  const report = useMemo(() => (data ? buildReport(data.jobs, data.labor, data.parts, data.settings, from, to) : null), [data, from, to])
+  const report = useMemo(() => (data ? buildReport(data, from, to) : null), [data, from, to])
   if (!data || !report) return null
-  const months = report.tables[3].rows
-  const revenue = months.reduce((a, r) => a + (r[4] as number), 0)
-  const profit = months.reduce((a, r) => a + (r[12] as number), 0)
+  const months = report.tables[4].rows
+  const revenue = months.reduce((a, r) => a + (r[6] as number), 0)
+  const profit = months.reduce((a, r) => a + (r[10] as number), 0)
 
   async function run(kind: 'sheets' | 'xlsx' | 'csv') {
     setBusy(kind)
@@ -50,7 +50,7 @@ export function ExportPage() {
         if (f) setDone({ text: `Saved ${f}` })
       } else {
         const d = await act(() => api.exportCsv(from, to))
-        if (d) setDone({ text: `Saved 4 CSV files to ${d}` })
+        if (d) setDone({ text: `Saved 5 CSV files to ${d}` })
       }
     } finally {
       setBusy('')
@@ -73,11 +73,11 @@ export function ExportPage() {
             <Field label="To"><input type="date" value={to} onChange={(e) => { setP('custom'); setRange([from, e.target.value]) }} style={{ width: 170 }} /></Field>
           </div>
           <p className="small muted" style={{ margin: 0 }}>
-            Includes <b className="num">{report.tables[0].rows.length}</b> jobs, <b className="num">{report.tables[1].rows.length}</b> labor entries and{' '}
-            <b className="num">{report.tables[2].rows.length}</b> parts. Finished jobs in range: revenue <b className="num">{fmtMoney(revenue)}</b>, profit{' '}
-            <b className="num">{fmtMoney(profit)}</b>. Leads and declined jobs are left out. A job counts on the day it was finished.
+            Includes <b className="num">{report.tables[0].rows.length}</b> completed repair orders, <b className="num">{report.tables[1].rows.length}</b> payments,{' '}
+            <b className="num">{report.tables[2].rows.length}</b> labor entries and <b className="num">{report.tables[3].rows.length}</b> part lines. Sales (before tax){' '}
+            <b className="num">{fmtMoney(revenue)}</b>, gross profit <b className="num">{fmtMoney(profit)}</b>. A sale counts on the day the RO was completed; a payment on the day it was received.
           </p>
-          <p className="small muted" style={{ margin: 0 }}>Four tabs: Jobs, Labor, Parts, Monthly summary.</p>
+          <p className="small muted" style={{ margin: 0 }}>Five tabs: Invoices, Payments, Labor, Parts, Monthly summary.</p>
         </section>
 
         <div className="grid2">
@@ -85,7 +85,7 @@ export function ExportPage() {
             <h2>Google Sheets</h2>
             <p className="small muted" style={{ margin: 0 }}>
               {data.settings.googleSpreadsheetId
-                ? 'Updates your Shopboard spreadsheet. Every tab is rewritten with this range.'
+                ? 'Updates your WIFT spreadsheet. Every tab is rewritten with this range.'
                 : 'The first push creates a spreadsheet in your Google Drive. Share it with your accountant once; later pushes update it.'}
             </p>
             {data.googleConnected ? (

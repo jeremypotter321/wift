@@ -57,7 +57,7 @@ export async function connect(clientId: string, clientSecret: string): Promise<v
         return
       }
       res.writeHead(200, { 'Content-Type': 'text/html' })
-      res.end(`<html><body style="font-family:system-ui;padding:40px"><h2>${err ? 'Google sign-in was cancelled.' : 'Shopboard is connected to Google.'}</h2><p>You can close this tab and go back to Shopboard.</p></body></html>`)
+      res.end(`<html><body style="font-family:system-ui;padding:40px"><h2>${err ? 'Google sign-in was cancelled.' : 'WIFT is connected to Google.'}</h2><p>You can close this tab and go back to WIFT.</p></body></html>`)
       clearTimeout(timer)
       if (err) reject(new Error(`Google sign-in failed: ${err}`))
       else resolve(c!)

@@ -147,7 +147,7 @@ const api = {
   async exportCsv(from: string, to: string) {
     const r = await dialog.showOpenDialog(win!, { title: 'Choose a folder for the CSV files', properties: ['openDirectory', 'createDirectory'] })
     if (r.canceled || !r.filePaths[0]) return null
-    const dir = path.join(r.filePaths[0], `shopboard-${rangeLabel(from, to)}`)
+    const dir = path.join(r.filePaths[0], `wift-${rangeLabel(from, to)}`)
     const files = writeCsvs(report(from, to), dir)
     shell.showItemInFolder(files[0])
     return dir
@@ -163,7 +163,7 @@ const api = {
   async pushSheets(from: string, to: string) {
     const s = db.getSettings()
     const res = await g.pushReport(report(from, to), {
-      clientId: s.googleClientId, clientSecret: s.googleClientSecret, spreadsheetId: s.googleSpreadsheetId, title: `${s.shopName}: Shopboard accounting`,
+      clientId: s.googleClientId, clientSecret: s.googleClientSecret, spreadsheetId: s.googleSpreadsheetId, title: `${s.shopName}: WIFT accounting`,
     })
     if (res.spreadsheetId !== s.googleSpreadsheetId) db.saveSettings({ googleSpreadsheetId: res.spreadsheetId })
     return res
@@ -177,8 +177,8 @@ const api = {
 
   async backupNow() {
     const r = await dialog.showSaveDialog(win!, {
-      defaultPath: path.join(app.getPath('documents'), `shopboard-backup-${new Date().toISOString().slice(0, 10)}.db`),
-      filters: [{ name: 'Shopboard database', extensions: ['db'] }],
+      defaultPath: path.join(app.getPath('documents'), `wift-backup-${new Date().toISOString().slice(0, 10)}.db`),
+      filters: [{ name: 'WIFT database', extensions: ['db'] }],
     })
     if (r.canceled || !r.filePath) return null
     db.save()
@@ -187,8 +187,8 @@ const api = {
   },
   async restore() {
     const r = await dialog.showOpenDialog(win!, {
-      title: 'Restore a Shopboard backup', defaultPath: path.join(dataDir, 'backups'),
-      filters: [{ name: 'Shopboard database', extensions: ['db'] }], properties: ['openFile'],
+      title: 'Restore a WIFT backup', defaultPath: path.join(dataDir, 'backups'),
+      filters: [{ name: 'WIFT database', extensions: ['db'] }], properties: ['openFile'],
     })
     if (r.canceled || !r.filePaths[0]) return false
     await db.restoreFrom(r.filePaths[0], dataDir)
@@ -221,7 +221,7 @@ ipcMain.handle('api', async (_e, method: string, args: unknown[]) => {
 
 function createWindow() {
   win = new BrowserWindow({
-    width: 1360, height: 860, minWidth: 1100, minHeight: 700, title: 'Shopboard', backgroundColor: '#F8FAFC', show: false,
+    width: 1360, height: 860, minWidth: 1100, minHeight: 700, title: 'WIFT', backgroundColor: '#F8FAFC', show: false,
     webPreferences: { preload: path.join(__dirname, '../preload/index.js'), contextIsolation: true, nodeIntegration: false, sandbox: true },
   })
   win.once('ready-to-show', () => {
