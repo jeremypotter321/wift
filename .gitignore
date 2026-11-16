@@ -3,3 +3,6 @@ out
 dist
 .DS_Store
 .devdata*
+
+# Third-party screenshots from Mobbin: kept locally for reference, not redistributed
+docs/research/mobbin/*/
