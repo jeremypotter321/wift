@@ -6,6 +6,19 @@ management app for an independent German-car repair shop. It's a desktop app for
 Its features use Tekmetric's as a baseline (`docs/research/tekmetric-features.md`). The design is its own, from Mobbin references
 (`docs/research/mobbin/`) and the UI brief (`docs/research/ui-brief-v2.md`).
 
+## Download
+Get the latest installer from [Releases](https://github.com/jeremypotter321/wift/releases/latest):
+
+| Computer | File |
+|---|---|
+| Windows 10/11 | `WIFT-<version>-win-x64.exe` |
+| Mac with Apple silicon (M1–M4) | `WIFT-<version>-mac-arm64.dmg` |
+| Mac with an Intel processor | `WIFT-<version>-mac-x64.dmg` |
+
+The installers aren't signed with a paid Apple or Microsoft certificate, so the first launch needs one extra step:
+- **Windows:** if SmartScreen says "Windows protected your PC", click **More info → Run anyway**.
+- **Mac:** open the .dmg and drag WIFT to Applications. Open it once. If macOS says it can't verify the developer, go to **System Settings → Privacy & Security** and click **Open Anyway**. If it says the app "is damaged", run `xattr -cr /Applications/WIFT.app` in Terminal, then open it again.
+
 ## Modules
 - **Dashboard:** today's sales, car count, average repair order (ARO) and gross profit %, each against the same day last week. It also shows today's appointments, the shop by stage, cars waiting on parts, and who's clocked in.
 - **Job board:** repair orders by stage (Estimate → Work in progress → Completed) or by tech. Move cards by drag-and-drop or the "Move to" menu. Late and inspection flags show on each card.

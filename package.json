@@ -1,7 +1,7 @@
 {
-  "name": "shopboard",
+  "name": "wift",
   "productName": "WIFT",
-  "version": "0.1.0",
+  "version": "1.0.0",
   "description": "WIFT: shop management for a German-car repair shop (repair orders, inspections, scheduling, inventory, reports, Google Sheets export)",
   "main": "out/main/index.js",
   "private": true,
@@ -75,5 +75,9 @@
     "typescript": "^7.0.2",
     "vite": "^8.3.8",
     "vitest": "^5.1.0"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/jeremypotter321/wift.git"
   }
 }
