@@ -143,6 +143,8 @@ app.whenReady().then(async () => {
   await db.openDb(dataDir, wasmDir)
   g.initGoogle(dataDir)
   if (process.env.SHOPBOARD_SEED === '1' && db.isEmpty()) loadSample()
+  // Packaged builds get the icon from build/icon.png via electron-builder; dev mode needs it set by hand.
+  if (!app.isPackaged && process.platform === 'darwin') app.dock?.setIcon(path.join(__dirname, '../../build/icon.png'))
   createWindow()
   app.on('activate', () => BrowserWindow.getAllWindows().length === 0 && createWindow())
 })
