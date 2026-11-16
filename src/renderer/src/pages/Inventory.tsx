@@ -2,7 +2,7 @@ import { useMemo, useState } from 'react'
 import { useNav } from '../App'
 import { api } from '../api'
 import { useData } from '../store'
-import { confirmDialog, csvOf, Empty, Field, fmtMoney, LazyInput, LazyNum, Menu, Modal, NumInput, Tabs, todayIso } from '../ui'
+import { confirmDialog, csvOf, Empty, Field, fmtMoney, LazyInput, LazyNum, LazyText, Menu, Modal, NumInput, Tabs, todayIso } from '../ui'
 import { matrixPrice } from '../../../shared/calc'
 import type { InventoryPart, PartCategory } from '../../../shared/types'
 
@@ -55,8 +55,8 @@ export function Inventory() {
         <input className="sm" style={{ width: 300 }} placeholder={tab === 'tire' ? 'Search size, brand, part #' : 'Search part #, description, brand, bin'} value={q} onChange={(e) => setQ(e.target.value)} aria-label="Search inventory" />
         <label className="check small"><input type="checkbox" checked={lowOnly} onChange={(e) => setLowOnly(e.target.checked)} />Low or out only</label>
       </div>
-      <section className="card flush">
-        <table>
+      <section className="card flush" style={{ overflowX: 'auto' }}>
+        <table className="inv">
           <thead><tr><th>Part #</th><th>Description</th>{tab === 'tire' && <th>Size</th>}<th>Bin</th><th className="n">On hand</th><th className="n">Committed</th><th className="n">Available</th><th className="n">Incoming</th><th className="n">Reorder at</th>{can.prices && <><th className="n">Cost</th><th className="n">Price</th></>}<th /></tr></thead>
           <tbody>
             <tr style={{ background: 'var(--canvas)' }}>
@@ -72,16 +72,16 @@ export function Inventory() {
             {rows.map(({ p, committed: c, incoming: inc, available }) => (
               <tr key={p.id}>
                 <td><LazyInput className="sm mono" value={p.partNumber} aria-label="Part number" onCommit={(partNumber) => save(p.id, { partNumber })} /></td>
-                <td><LazyInput className="sm" value={p.description} aria-label="Description" onCommit={(description) => save(p.id, { description })} /><div className="small muted" style={{ paddingLeft: 8 }}>{[p.brand, vendor(p.vendorId)].filter(Boolean).join(' · ')}</div></td>
-                {tab === 'tire' && <td><LazyInput className="sm" value={p.tireSize} onCommit={(tireSize) => save(p.id, { tireSize })} /></td>}
-                <td style={{ width: 90 }}><LazyInput className="sm" value={p.location} aria-label="Bin" onCommit={(location) => save(p.id, { location })} /></td>
+                <td><LazyText className="sm" value={p.description} aria-label="Description" onCommit={(description) => save(p.id, { description })} /><div className="small muted" style={{ paddingLeft: 8 }}>{[p.brand, vendor(p.vendorId)].filter(Boolean).join(' · ')}</div></td>
+                {tab === 'tire' && <td style={{ minWidth: 110 }}><LazyInput className="sm" value={p.tireSize} onCommit={(tireSize) => save(p.id, { tireSize })} /></td>}
+                <td><LazyInput className="sm" value={p.location} aria-label="Bin" onCommit={(location) => save(p.id, { location })} /></td>
                 <td className="n num strong">{p.onHand}</td>
                 <td className="n num">{c || '—'}</td>
                 <td className="n">{available <= 0 ? <span className="pill p-red nodot">Out {available}</span> : available <= p.minQty ? <span className="pill p-amber nodot">Low {available}</span> : <span className="num">{available}</span>}</td>
                 <td className="n num">{inc || '—'}</td>
-                <td className="n" style={{ width: 80 }}><LazyNum className="sm" value={p.minQty} step="1" aria-label="Reorder at" onCommit={(minQty) => save(p.id, { minQty })} /></td>
+                <td className="n"><LazyNum className="sm" value={p.minQty} step="1" aria-label="Reorder at" onCommit={(minQty) => save(p.id, { minQty })} /></td>
                 {can.prices && <>
-                  <td className="n" style={{ width: 100 }}><LazyNum className="sm" prefix="$" value={p.cost} aria-label="Cost" onCommit={(cost) => save(p.id, { cost })} /></td>
+                  <td className="n"><LazyNum className="sm" prefix="$" value={p.cost} aria-label="Cost" onCommit={(cost) => save(p.id, { cost })} /></td>
                   <td className="n" style={{ width: 100 }}>{p.price ? fmtMoney(p.price) : <span className="muted" title="From the pricing matrix">{fmtMoney(matrixPrice(p.cost, data.settings))}</span>}</td>
                 </>}
                 <td style={{ width: 40 }}>

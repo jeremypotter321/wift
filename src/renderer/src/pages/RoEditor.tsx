@@ -3,7 +3,7 @@ import { useNav } from '../App'
 import { api } from '../api'
 import { useData } from '../store'
 import {
-  Avatar, confirmDialog, ContentEditor, Empty, fmtDate, fmtHours, fmtMoney, Hourly, LazyInput, LazyNum, Menu, NumInput, RiskEditor, RoPill, Tabs, VerdictCard,
+  Avatar, confirmDialog, ContentEditor, Empty, fmtDate, fmtHours, fmtMoney, Hourly, LazyInput, LazyNum, LazyText, Menu, NumInput, RiskEditor, RoPill, Tabs, VerdictCard,
 } from '../ui'
 import { JobCard } from '../ro/JobCard'
 import { InspectionTab } from '../ro/InspectionTab'
@@ -127,7 +127,7 @@ export function RoEditor({ id, initialTab }: { id: number; initialTab?: string }
           {tab === 'jobs' && (
             <div>
               <div className="card" style={{ marginBottom: 12, padding: 12 }}>
-                <label className="field">Customer concern<LazyInput value={ro.concern} placeholder="What the customer says is wrong, in their words" onCommit={(concern) => save({ concern })} /></label>
+                <label className="field">Customer concern<LazyText value={ro.concern} placeholder="What the customer says is wrong, in their words" onCommit={(concern) => save({ concern })} /></label>
               </div>
               {b.jobs.length === 0 && <div className="card" style={{ marginBottom: 12 }}><Empty text="No jobs yet. Add a job or pick a canned job." /></div>}
               {b.jobs.map((j) => <JobCard key={j.id} job={j} lines={b.lines.filter((l) => l.jobId === j.id)} />)}
@@ -242,13 +242,14 @@ function VehicleSwitch({ roId, customerId, current, onAdd }: { roId: number; cus
   const { data, act } = useData()
   const mine = data.vehicles.filter((v) => v.customerId === customerId)
   return (
-    <select className="sm" style={{ marginTop: 4 }} aria-label="Vehicle" value={current ?? ''} onChange={(e) => {
+    <select className="sm" style={{ marginTop: 4, width: 'auto', maxWidth: '100%' }} aria-label={current ? 'Change vehicle' : 'Choose vehicle'} value="" onChange={(e) => {
       if (e.target.value === 'new') return onAdd()
-      const v = mine.find((x) => x.id === Number(e.target.value))
+      const v = e.target.value === 'remove' ? undefined : mine.find((x) => x.id === Number(e.target.value))
       void act(() => api.save('ros', { id: roId, vehicleId: v?.id ?? null, ...(v ? { mileageIn: v.mileage } : {}) }))
     }}>
-      <option value="">{current ? 'Remove vehicle' : 'Choose vehicle…'}</option>
-      {mine.map((v) => <option key={v.id} value={v.id}>{vehicleName(v)}{v.plate ? ` · ${v.plate}` : ''}</option>)}
+      <option value="" disabled>{current ? 'Change vehicle…' : 'Choose vehicle…'}</option>
+      {mine.filter((v) => v.id !== current).map((v) => <option key={v.id} value={v.id}>{vehicleName(v)}{v.plate ? ` · ${v.plate}` : ''}</option>)}
+      {current && <option value="remove">Remove vehicle from RO</option>}
       <option value="new">+ Add vehicle…</option>
     </select>
   )
@@ -291,7 +292,7 @@ function ContentTab({ roId }: { roId: number }) {
   const [platform, setPlatform] = useState<string>(PLATFORMS[0])
   const [url, setUrl] = useState('')
   return (
-    <div className="split" style={{ gridTemplateColumns: 'minmax(0,1fr) minmax(0,1.3fr)' }}>
+    <div className="content-split">
       <div className="card">
         <div className="row between"><h2 style={{ margin: 0 }}>Content score</h2><b className="num" style={{ fontSize: 24 }}>{contentScore(ro.content)}/10</b></div>
         <p className="small muted">Would this job make a good TikTok / YouTube / Instagram post? A score of {data.settings.contentBumpScore}+ raises the take-it verdict a level.</p>
@@ -300,7 +301,7 @@ function ContentTab({ roId }: { roId: number }) {
       <div className="card flush">
         <div className="card-head"><h2>Posts</h2><span className="small muted num">{posts.reduce((a, p) => a + p.views, 0).toLocaleString()} views</span></div>
         <div className="row" style={{ padding: 12, borderBottom: '1px solid var(--divider)' }}>
-          <select style={{ width: 130 }} value={platform} onChange={(e) => setPlatform(e.target.value)}>{PLATFORMS.map((p) => <option key={p}>{p}</option>)}</select>
+          <select style={{ width: 130, flex: 'none' }} value={platform} onChange={(e) => setPlatform(e.target.value)}>{PLATFORMS.map((p) => <option key={p}>{p}</option>)}</select>
           <input placeholder="Link (optional)" value={url} onChange={(e) => setUrl(e.target.value)} />
           <button className="btn primary" onClick={async () => { await act(() => api.save('posts', { roId, platform, url })); setUrl('') }}>Add post</button>
         </div>

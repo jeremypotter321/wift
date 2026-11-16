@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, type ReactNode } from 'react'
+import { useEffect, useLayoutEffect, useRef, useState, type ReactNode } from 'react'
 import { payState, type RoTotals, type Tint, type Verdict } from '../../shared/calc'
 import { CONTENT_FACTORS, RISK_FLAGS, type ContentFactor, type ContentScores, type RepairOrder, type RiskFlag, type User } from '../../shared/types'
 
@@ -66,6 +66,22 @@ export function LazyInput({ value, onCommit, className, ...rest }: { value: stri
   return (
     <input value={v} className={className} onChange={(e) => setV(e.target.value)} onBlur={() => v !== value && onCommit(v)}
       onKeyDown={(e) => e.key === 'Enter' && (e.target as HTMLInputElement).blur()} {...rest} />
+  )
+}
+/** Like LazyInput, but wraps and grows with its text so long descriptions are never cut off. Enter commits; Shift+Enter is a new line. */
+export function LazyText({ value, onCommit, className, ...rest }: { value: string; onCommit: (v: string) => void; className?: string; placeholder?: string; 'aria-label'?: string }) {
+  const [v, setV] = useState(value)
+  const ref = useRef<HTMLTextAreaElement>(null)
+  useEffect(() => setV(value), [value])
+  useLayoutEffect(() => {
+    const el = ref.current
+    if (!el) return
+    el.style.height = 'auto'
+    el.style.height = `${el.scrollHeight + 2}px`
+  })
+  return (
+    <textarea ref={ref} rows={1} value={v} className={`autogrow ${className ?? ''}`} onChange={(e) => setV(e.target.value)} onBlur={() => v !== value && onCommit(v)}
+      onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); e.currentTarget.blur() } }} {...rest} />
   )
 }
 export function LazyNum({ value, onCommit, ...rest }: { value: number; onCommit: (n: number) => void; prefix?: string; step?: string; className?: string; 'aria-label'?: string }) {

@@ -2,7 +2,7 @@ import { useMemo, useState } from 'react'
 import { useNav } from '../App'
 import { api } from '../api'
 import { useData } from '../store'
-import { csvOf, Empty, fmtDate, fmtHours, fmtMoney, localDate, Seg, todayIso } from '../ui'
+import { csvOf, Empty, fmtDate, fmtHours, fmtMoney, fmtShortDate, localDate, todayIso } from '../ui'
 import { hoursBetween, lineAmount, round2 } from '../../../shared/calc'
 import { vehicleName } from '../../../shared/bundle'
 
@@ -68,7 +68,7 @@ export function Reports() {
   if (rep === 'overview' || rep === 'sales') {
     table = {
       headers: ['Completed', 'RO', 'Customer', 'Vehicle', 'Labor', 'Parts', 'Sales (pre-tax)', 'Tax', 'Total'], numeric: [4, 5, 6, 7, 8],
-      rows: cur.done.map((r) => { const t = ix.totals(r.id).totals; return [fmtDate(r.completedAt), r.number, ix.customers.get(r.customerId ?? -1)?.name ?? '', vehicleName(ix.vehicles.get(r.vehicleId ?? -1)), fmtMoney(t.labor), fmtMoney(t.parts), fmtMoney(t.subtotal), fmtMoney(t.tax), fmtMoney(t.total)] }),
+      rows: cur.done.map((r) => { const t = ix.totals(r.id).totals; return [fmtShortDate(r.completedAt), r.number, ix.customers.get(r.customerId ?? -1)?.name ?? '', vehicleName(ix.vehicles.get(r.vehicleId ?? -1)), fmtMoney(t.labor), fmtMoney(t.parts), fmtMoney(t.subtotal), fmtMoney(t.tax), fmtMoney(t.total)] }),
       onRow: (i) => nav({ page: 'ro', id: cur.done[i].id }),
     }
     if (rep === 'sales') extra = <SalesChart from={from} to={to} done={cur.done.map((r) => ({ date: r.completedAt, sales: ix.totals(r.id).totals.subtotal }))} />
@@ -141,8 +141,9 @@ export function Reports() {
         </nav>
         <div className="stack">
           <div className="row wrap">
-            <Seg options={['today', 'week', 'month', '30', 'year'] as const} labels={{ today: 'Today', week: 'This week', month: 'This month', '30': 'Last 30 days', year: 'This year' }}
-              value={preset as 'today'} onChange={(p) => { setPreset(p); setRange(periodOf(p)) }} />
+            <select className="sm" style={{ width: 160 }} aria-label="Period" value={preset} onChange={(e) => { setPreset(e.target.value); if (e.target.value) setRange(periodOf(e.target.value)) }}>
+              <option value="today">Today</option><option value="week">This week</option><option value="month">This month</option><option value="30">Last 30 days</option><option value="year">This year</option><option value="">Custom</option>
+            </select>
             <input type="date" className="sm" style={{ width: 150 }} value={from} onChange={(e) => { setPreset(''); setRange([e.target.value, to]) }} aria-label="From" />
             <span className="muted">to</span>
             <input type="date" className="sm" style={{ width: 150 }} value={to} onChange={(e) => { setPreset(''); setRange([from, e.target.value]) }} aria-label="To" />
@@ -167,7 +168,7 @@ export function Reports() {
               <div className="totals" style={{ maxWidth: 420 }}>
                 <span>Labor</span><span className="r">{fmtMoney(cur.labor)}</span><span>Parts</span><span className="r">{fmtMoney(cur.parts)}</span>
                 <span>Fees & sublet</span><span className="r">{fmtMoney(cur.fees)}</span><span>Shop supplies</span><span className="r">{fmtMoney(cur.supplies)}</span>
-                <span>Discounts</span><span className="r">−{fmtMoney(cur.discount)}</span><span className="rule" />
+                <span>Discounts</span><span className="r">{cur.discount ? `−${fmtMoney(cur.discount)}` : fmtMoney(0)}</span><span className="rule" />
                 <span className="big">Net sales</span><span className="big r">{fmtMoney(cur.sales)}</span><span>Sales tax collected</span><span className="r">{fmtMoney(cur.tax)}</span>
               </div>
             </div>

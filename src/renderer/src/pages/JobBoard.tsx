@@ -121,8 +121,7 @@ function RoCard({ ro, onMove }: { ro: RepairOrder; onMove: (ro: RepairOrder, s: 
         {appt && <span className="small muted">{appt.dropOff ? '⇣ Drop-off' : '◔ Waiting'}</span>}
         {now > 0 && <span className="small tint-bad strong">✕ {now} Now</span>}
         {soon > 0 && <span className="small tint-warn strong">! {soon} Soon</span>}
-        <span className="grow" />
-        {can.prices && <span className="small num strong">{fmtMoney(t.total, false)}</span>}
+        {can.prices && <span className="small num strong" style={{ marginLeft: 'auto' }}>{fmtMoney(t.total, false)}</span>}
         <span onClick={(e) => e.stopPropagation()}>
           <Menu label="⋯" className="btn ghost sm icon" items={[
             ro.status !== 'estimate' && { label: 'Move to Estimates', onClick: () => onMove(ro, 'estimate') },

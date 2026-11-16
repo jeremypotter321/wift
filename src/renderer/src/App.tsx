@@ -54,7 +54,15 @@ export function App() {
   const [route, setRoute] = useState<Route>({ page: 'dashboard' })
   const [search, setSearch] = useState(false)
   const [switching, setSwitching] = useState(false)
-  const [collapsed, setCollapsed] = useState(() => localStorage.getItem('shopboard.sb') === '1' || window.innerWidth < 1280)
+  // Sidebar: follows the window width (icon rail under 1280px) unless the user toggled it with ⌘\.
+  const [sbPref, setSbPref] = useState<boolean | null>(() => { const v = localStorage.getItem('shopboard.sb'); return v == null ? null : v === '1' })
+  const [narrow, setNarrow] = useState(() => window.innerWidth < 1280)
+  useEffect(() => {
+    const onResize = () => setNarrow(window.innerWidth < 1280)
+    window.addEventListener('resize', onResize)
+    return () => window.removeEventListener('resize', onResize)
+  }, [])
+  const collapsed = sbPref ?? narrow
 
   const nav = (r: Route) => {
     setRoute(r)
@@ -69,7 +77,7 @@ export function App() {
     const onKey = (e: KeyboardEvent) => {
       const typing = (e.target as HTMLElement).closest('input, textarea, select, [contenteditable]')
       if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'k') { e.preventDefault(); setSearch(true) }
-      else if ((e.metaKey || e.ctrlKey) && e.key === '\\') { e.preventDefault(); setCollapsed((c) => { localStorage.setItem('shopboard.sb', c ? '0' : '1'); return !c }) }
+      else if ((e.metaKey || e.ctrlKey) && e.key === '\\') { e.preventDefault(); localStorage.setItem('shopboard.sb', collapsed ? '0' : '1'); setSbPref(!collapsed) }
       else if (!typing && !e.metaKey && !e.ctrlKey && e.key === '/') { e.preventDefault(); setSearch(true) }
       else if (!typing && !e.metaKey && !e.ctrlKey && e.key.toLowerCase() === 'n' && user?.role !== 'tech') { e.preventDefault(); void newRo() }
     }
@@ -176,7 +184,7 @@ function NewMenu({ nav }: { nav: (r: Route) => void }) {
   const [open, setOpen] = useState(false)
   const items: [string, Route][] = [['Appointment', { page: 'appointments' }], ['Customer', { page: 'customers' }], ['Purchase order', { page: 'pos' }], ['Payment', { page: 'payments' }]]
   return (
-    <div className="rel" style={{ display: 'flex' }}>
+    <div className="rel new-more">
       <button className="btn primary" aria-label="More new items" aria-expanded={open} onClick={() => setOpen(!open)}>▾</button>
       {open && (
         <div className="popover" style={{ left: 0, top: '100%', marginTop: 4 }} onMouseLeave={() => setOpen(false)}>

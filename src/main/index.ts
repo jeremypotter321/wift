@@ -12,6 +12,8 @@ import { ENTITIES, type EntityName, type EntityTypes } from '../shared/entities'
 import { buildReport } from '../shared/report'
 import type { Settings, Snapshot } from '../shared/types'
 
+// A custom data folder (tests, demos) also gets its own browser storage, so the signed-in user etc. never leak between them.
+if (process.env.SHOPBOARD_DATA_DIR) app.setPath('userData', path.resolve(process.env.SHOPBOARD_DATA_DIR))
 const dataDir = process.env.SHOPBOARD_DATA_DIR || app.getPath('userData')
 const photoDir = path.join(dataDir, 'photos')
 const docDir = path.join(dataDir, 'documents')

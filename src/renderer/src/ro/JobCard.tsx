@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { api } from '../api'
 import { useData } from '../store'
-import { confirmDialog, fmtMoney, LazyInput, LazyNum, Menu, Seg, useElapsed } from '../ui'
+import { confirmDialog, fmtMoney, LazyInput, LazyNum, LazyText, Menu, Seg, useElapsed } from '../ui'
 import { PartPicker } from './Modals'
 import { laborRate, lineAmount, matrixMarkupPct, matrixPrice } from '../../../shared/calc'
 import type { JobStatus, LineKind, RoJob, RoLine } from '../../../shared/types'
@@ -35,7 +35,7 @@ export function JobCard({ job, lines }: { job: RoJob; lines: RoLine[] }) {
   return (
     <div className={`job ${job.status === 'declined' ? 'declined' : ''}`}>
       <div className="job-head">
-        <LazyInput className="title grow" value={job.title} aria-label="Job name" onCommit={(title) => act(() => api.save('jobs', { id: job.id, title }))} />
+        <LazyText className="title" value={job.title} aria-label="Job name" onCommit={(title) => act(() => api.save('jobs', { id: job.id, title }))} />
         <select className="sm" style={{ width: 104 }} aria-label="Tech for this job" value={job.techId ?? ''} onChange={(e) => act(() => api.save('jobs', { id: job.id, techId: e.target.value ? Number(e.target.value) : null }))}>
           <option value="">No tech</option>
           {techs.map((u) => <option key={u.id} value={u.id}>{u.name}</option>)}
@@ -95,7 +95,7 @@ function LineRow({ l, roId, jobId, save, userId }: { l: RoLine; roId: number; jo
     <tr>
       <td aria-label={KIND_LABEL[l.kind]} title={KIND_LABEL[l.kind]}>{ICON[l.kind]}</td>
       <td>
-        <LazyInput value={l.description} placeholder={KIND_LABEL[l.kind]} aria-label="Description" onCommit={(description) => save(l.id, { description })} />
+        <LazyText value={l.description} placeholder={KIND_LABEL[l.kind]} aria-label="Description" onCommit={(description) => save(l.id, { description })} />
         {l.kind === 'part' && <LazyInput className="sub mono" value={l.partNumber} placeholder="Part #" aria-label="Part number" onCommit={(partNumber) => save(l.id, { partNumber })} />}
         {l.kind === 'labor' && can.prices && (
           <select className="sm" style={{ height: 22, fontSize: 11, border: 0, color: 'var(--text-3)', width: 'auto', paddingLeft: 6 }} aria-label="Labor rate" value={l.laborRateId}

@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { api } from '../api'
 import { useData } from '../store'
-import { confirmDialog, Empty, Field, fmtHours, fmtMoney, LazyInput, LazyNum, Menu } from '../ui'
+import { confirmDialog, Empty, Field, fmtHours, fmtMoney, LazyInput, LazyNum, LazyText, Menu } from '../ui'
 import { laborRate, matrixPrice } from '../../../shared/calc'
 import { LINE_KINDS, type CannedJob, type CannedLine, type LineKind } from '../../../shared/types'
 
@@ -33,7 +33,7 @@ export function CannedJobs() {
     <div className="page">
       <div className="page-head"><h1>Canned jobs</h1><span className="muted">Standard jobs with set lines. Pick them on any RO.</span><span className="grow" />
         <button className="btn primary" onClick={async () => { const c = await act(() => api.save('cannedJobs', { name: 'New canned job', category: 'Other' })); if (c) setSelId(c.id) }}>+ New canned job</button></div>
-      <div style={{ display: 'grid', gridTemplateColumns: '320px minmax(0,1fr)', gap: 16, alignItems: 'start' }}>
+      <div className="master-detail">
         <aside className="card flush">
           <div style={{ padding: 8 }}><input className="sm" placeholder="Search" value={q} onChange={(e) => setQ(e.target.value)} aria-label="Search canned jobs" /></div>
           {cats.map((cat) => {
@@ -56,7 +56,7 @@ export function CannedJobs() {
           <section className="stack">
             <div className="card stack">
               <div className="grid3">
-                <Field label="Name"><LazyInput value={sel.name} onCommit={(name) => save({ name })} /></Field>
+                <Field label="Name"><LazyText value={sel.name} onCommit={(name) => save({ name })} /></Field>
                 <Field label="Category"><LazyInput value={sel.category} onCommit={(category) => save({ category })} /></Field>
                 <div className="row" style={{ alignItems: 'flex-end', gap: 8 }}>
                   <Field label="Remind every (months)"><LazyNum value={sel.intervalMonths} step="1" onCommit={(intervalMonths) => save({ intervalMonths })} /></Field>
@@ -69,10 +69,10 @@ export function CannedJobs() {
             <div className="job">
               <div className="job-head"><b className="grow">{sel.name}</b>{can.prices && <b className="num">{fmtMoney(total(sel))}</b>}</div>
               {sel.lines.length > 0 && (
-                <table className="lines"><tbody>{sel.lines.map((l, i) => (
+                <div style={{ overflowX: 'auto' }}><table className="lines" style={{ minWidth: 620 }}><tbody>{sel.lines.map((l, i) => (
                   <tr key={i}>
                     <td><select className="sm" value={l.kind} onChange={(e) => setLine(i, { kind: e.target.value as LineKind })} style={{ width: 92 }} aria-label="Line type">{LINE_KINDS.map((k) => <option key={k} value={k}>{k}</option>)}</select></td>
-                    <td><LazyInput value={l.description} placeholder="Description" onCommit={(description) => setLine(i, { description })} />
+                    <td><LazyText value={l.description} placeholder="Description" onCommit={(description) => setLine(i, { description })} />
                       {l.kind === 'part' && <LazyInput className="sub mono" value={l.partNumber} placeholder="Part #" onCommit={(partNumber) => setLine(i, { partNumber })} />}</td>
                     <td style={{ width: 72 }}><LazyNum value={l.qty} step="0.1" aria-label={l.kind === 'labor' ? 'Hours' : 'Qty'} onCommit={(qty) => setLine(i, { qty })} /></td>
                     {can.prices && <>
@@ -85,7 +85,7 @@ export function CannedJobs() {
                     </>}
                     <td style={{ width: 40 }}><Menu label="⋯" items={[{ label: 'Delete line', danger: true, onClick: () => save({ lines: sel.lines.filter((_, k) => k !== i) }) }]} /></td>
                   </tr>
-                ))}</tbody></table>
+                ))}</tbody></table></div>
               )}
               <div className="job-foot">{(['labor', 'part', 'fee', 'sublet'] as LineKind[]).map((k) => <button key={k} className="btn ghost sm" onClick={() => addLine(k)}>+ {k[0].toUpperCase() + k.slice(1)}</button>)}</div>
             </div>

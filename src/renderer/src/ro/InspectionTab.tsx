@@ -1,7 +1,7 @@
 import { useMemo, useState } from 'react'
 import { api } from '../api'
 import { useData } from '../store'
-import { confirmDialog, Empty, LazyInput, Modal, todayIso } from '../ui'
+import { confirmDialog, Empty, LazyText, Modal, todayIso } from '../ui'
 import type { InspectionItem, Rating } from '../../../shared/types'
 
 const RATE: { r: Exclude<Rating, '' | 'na'>; glyph: string; word: string }[] = [
@@ -99,7 +99,7 @@ export function InspectionTab({ roId, onPrint }: { roId: number; onPrint: () => 
                   if (e.key === 'ArrowUp') { e.preventDefault(); ((e.currentTarget.parentElement?.previousElementSibling?.firstElementChild) as HTMLElement | null)?.focus() }
                   if (e.key === 'Enter') setOpen(open === it.id ? null : it.id)
                 }}>
-                <span className="grow">
+                <span className="grow item-name">
                   <span>{it.name}</span>
                   {!section && (idx === 0 || shown[idx - 1].section !== it.section) && <span className="small muted"> · {it.section}</span>}
                   {it.note && <div className="small muted ellipsis">{it.note}</div>}
@@ -115,7 +115,7 @@ export function InspectionTab({ roId, onPrint }: { roId: number; onPrint: () => 
               </div>
               {open === it.id && (
                 <div className="stack tight" style={{ padding: '0 12px 12px' }}>
-                  <LazyInput value={it.note} placeholder="Note (what you found, measurements)" aria-label="Note" onCommit={(note) => act(() => api.save('inspectionItems', { id: it.id, note }))} />
+                  <LazyText value={it.note} placeholder="Note (what you found, measurements)" aria-label="Note" onCommit={(note) => act(() => api.save('inspectionItems', { id: it.id, note }))} />
                   <div className="thumbs">
                     {it.photos.map((p) => <img key={p} src={`shopfile://photo/${p}`} alt={`Photo of ${it.name}`} onClick={() => setLightbox(p)} />)}
                     <label className="btn sm" style={{ height: 72, width: 96 }}>+ Photo<input type="file" accept="image/*" multiple hidden onChange={(e) => addPhotos(it, e.target.files)} /></label>

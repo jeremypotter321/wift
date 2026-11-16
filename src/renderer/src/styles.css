@@ -293,3 +293,45 @@ td input, td select { height: 32px; font-size: 13px; }
 .lines .cost .prefix > span { font-size: 11px; }
 .job-head .seg button { padding: 0 8px; }
 .job-head input.title { min-width: 160px; }
+
+/* ---------- layout audit fixes ---------- */
+textarea.autogrow { min-height: 0; resize: none; overflow: hidden; height: 34px; padding: 6px 8px; line-height: 20px; }
+.lines textarea.autogrow { font-size: 13px; padding: 5px 6px; line-height: 18px; border-color: transparent; background: transparent; }
+.lines textarea.autogrow:hover { border-color: var(--divider); background: var(--bg); }
+.lines textarea.autogrow:focus { background: var(--bg); }
+.job-head { flex-wrap: wrap; }
+.job-head textarea.title { flex: 1 1 240px; min-width: 200px; font-size: 16px; font-weight: 600; line-height: 22px; padding: 5px 6px; border-color: transparent; }
+.job-head textarea.title:hover { border-color: var(--divider); }
+.job-head select, .job-head .seg, .job-head b { flex: none; }
+td textarea.autogrow.sm { font-size: 13px; padding: 5px 8px; line-height: 18px; }
+table.inv { min-width: 1080px; }
+table.inv td:nth-child(1) { min-width: 130px; } table.inv td:nth-child(2) { min-width: 230px; }
+
+.month { grid-template-columns: repeat(7, minmax(0, 1fr)); }
+.month > div { min-width: 0; overflow: hidden; }
+.dvi-row .item-name { overflow-wrap: anywhere; }
+.dvi-row .item-name > span:first-child { display: inline; }
+.master-detail { display: grid; grid-template-columns: 320px minmax(0, 1fr); gap: 16px; align-items: start; }
+.content-split { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.3fr); gap: 16px; align-items: start; }
+.content-split .row.between { flex-wrap: wrap; row-gap: 4px; }
+@media (max-width: 1279px) {
+  .master-detail { grid-template-columns: 240px minmax(0, 1fr); }
+  .content-split { grid-template-columns: minmax(0, 1fr); }
+  .dvi { grid-template-columns: 170px minmax(0, 1fr); }
+  .rate button { width: 66px; }
+  .ro-cells { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+}
+.tabs { overflow-x: auto; } .tabs button { white-space: nowrap; flex: none; }
+table.inv td input.sm { min-width: 72px; }
+table.inv { min-width: 980px; }
+/* collapsed rail: the New button is a single square + */
+.collapsed .sb-new { margin: 0 12px 8px; }
+.collapsed .sb-new .rel { display: none; }
+.collapsed .sb-new .btn { min-width: 0; padding: 0; border-radius: var(--r); }
+/* job header: total + menu always pinned right; on narrow windows the name gets its own row */
+.job-head > b.num { margin-left: auto; }
+@media (max-width: 1279px) { .job-head textarea.title { flex-basis: 100%; } }
+/* inventory: tighter cell padding so every column fits at the default window size */
+table.inv th, table.inv td { padding-left: 8px; padding-right: 8px; }
+.new-more { display: flex; }
+.collapsed .new-more { display: none; }

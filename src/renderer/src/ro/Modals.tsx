@@ -282,7 +282,7 @@ export function CannedPicker({ onPick, onClose }: { onPick: (id: number) => void
         <div className="row">
           <input autoFocus placeholder="Search canned jobs" value={q} onChange={(e) => setQ(e.target.value)}
             onKeyDown={(e) => e.key === 'Enter' && hits[0] && onPick(hits[0].id)} />
-          <select style={{ width: 160 }} value={cat} onChange={(e) => setCat(e.target.value)}><option value="">All categories</option>{cats.map((c) => <option key={c}>{c}</option>)}</select>
+          <select style={{ width: 190, flex: 'none' }} value={cat} onChange={(e) => setCat(e.target.value)}><option value="">All categories</option>{cats.map((c) => <option key={c}>{c}</option>)}</select>
         </div>
         <div>
           {hits.map((c) => {
