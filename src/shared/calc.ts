@@ -1,5 +1,5 @@
-import type { ContentScores, Customer, LaborEntry, Payment, RepairOrder, RoJob, RoLine, Settings, User } from './types'
-import { RISK_FLAGS } from './types'
+import type { ContentFactor, ContentScores, Customer, LaborEntry, Payment, RepairOrder, RoJob, RoLine, Settings, User } from './types'
+import { CONTENT_FACTORS, RISK_FLAGS } from './types'
 
 export const round2 = (n: number) => Math.round((n + Number.EPSILON) * 100) / 100
 
@@ -27,6 +27,23 @@ export const lineCost = (l: RoLine) => (l.kind === 'labor' || l.kind === 'discou
 
 export function contentScore(c: ContentScores): number {
   return Object.values(c).reduce((a, b) => a + (Number(b) || 0), 0)
+}
+
+/**
+ * Content score from the shop's keyword lists (Settings ▸ Content keywords). Each factor scores 1 for one matching
+ * keyword and 2 for two or more. Matches whole words/phrases, case-insensitive, in the text given (vehicle, concern, jobs, notes).
+ */
+export function keywordContent(text: string, s: Settings): { scores: ContentScores; hits: Record<ContentFactor, string[]> } {
+  const hay = ` ${text.toLowerCase().replace(/[^a-z0-9+/.-]+/g, ' ')} `
+  const scores = {} as ContentScores
+  const hits = {} as Record<ContentFactor, string[]>
+  for (const k of Object.keys(CONTENT_FACTORS) as ContentFactor[]) {
+    const words = (s.contentKeywords?.[k] ?? '').split(',').map((w) => w.trim()).filter(Boolean)
+    const norm = (w: string) => w.toLowerCase().replace(/[^a-z0-9+/.-]+/g, ' ').trim()
+    hits[k] = [...new Set(words.filter((w) => norm(w) && hay.includes(` ${norm(w)} `)))]
+    scores[k] = Math.min(2, hits[k].length)
+  }
+  return { scores, hits }
 }
 
 export interface RoTotals {

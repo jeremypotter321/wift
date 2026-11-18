@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { contentScore, hourlyTint, matrixPrice, payState, roTotals, verdict, type RoBundle } from './calc'
+import { contentScore, hourlyTint, keywordContent, matrixPrice, payState, roTotals, verdict, type RoBundle } from './calc'
 import { DEFAULT_SETTINGS, emptyContent, type RepairOrder, type RoJob, type RoLine, type Settings } from './types'
 
 // No supplies / tax unless a test turns them on. Cost/hr = 30 + 35 = 65. Target 125, band 15%.
@@ -136,5 +136,18 @@ describe('effective $/hr while work is open', () => {
     const done = roTotals(bundle({ ro: ro({ status: 'completed' }), jobs: [job(1, 'approved')], labor: [entry(1.5)] }), s)
     expect(done.effectiveHourly).toBe(220) // beat book time: 330 / 1.5
     expect(done.laborCost).toBe(97.5)
+  })
+})
+
+describe('keywordContent', () => {
+  const s = { ...DEFAULT_SETTINGS, contentKeywords: { rarity: 'M3, Alpina', transformation: 'single turbo', story: '', satisfying: 'walnut blast', trend: 'E85, N54, tune' } }
+  it('scores 1 for one keyword and 2 for two or more, whole words only', () => {
+    const { scores, hits } = keywordContent('2008 BMW 335i N54 · E85 flex fuel + tune, walnut blast intake', s)
+    expect(scores).toEqual({ rarity: 0, transformation: 0, story: 0, satisfying: 1, trend: 2 })
+    expect(hits.trend).toEqual(['E85', 'N54', 'tune'])
+  })
+  it('does not match inside other words', () => {
+    expect(keywordContent('M340i tuner', s).scores.rarity).toBe(0)
+    expect(keywordContent('M340i tuner', s).scores.trend).toBe(0)
   })
 })

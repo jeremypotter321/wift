@@ -2,7 +2,7 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import { api } from '../api'
 import { useData } from '../store'
 import { Field, fmtMoney, Modal, NumInput, Seg, todayIso } from '../ui'
-import { inspectionDocument, roDocument, type DocOptions } from '../docs'
+import { inspectionDocument, estimateForm, roDocument, type DocOptions } from '../docs'
 import { lineAmount, matrixPrice, roTotals } from '../../../shared/calc'
 import { vehicleName } from '../../../shared/bundle'
 import { PAYMENT_METHODS, type Customer, type InventoryPart, type JobStatus, type Vehicle } from '../../../shared/types'
@@ -94,9 +94,11 @@ export function PrintModal({ roId, initial, onClose }: { roId: number; initial: 
   const v = b.ro.vehicleId ? ix.vehicles.get(b.ro.vehicleId) ?? null : null
   const insp = data.inspections.filter((i) => i.roId === roId).at(-1)
   const [doc, setDoc] = useState<'estimate' | 'invoice' | 'inspection'>(initial)
-  const [o, setO] = useState<Omit<DocOptions, 'kind'>>({ partNumbers: true, laborHours: true, includeDeclined: false, message: '', stripes: false })
+  const [o, setO] = useState<Omit<DocOptions, 'kind'>>({ partNumbers: true, laborHours: true, includeDeclined: false, message: '', stripes: false, notes: data.settings.estimateNotes, urgency: '', customerCopy: true })
   const html = useMemo(() => {
     if (doc === 'inspection') return insp ? inspectionDocument(b, insp, data.inspectionItems.filter((i) => i.inspectionId === insp.id), data.settings, v, o.stripes) : '<p style="font-family:sans-serif;padding:24px">No inspection on this RO yet.</p>'
+    // Estimates print on the shop's own estimate form (Copper Calibration template); invoices keep the standard layout.
+    if (doc === 'estimate') return estimateForm(b, t, data.settings, v, { ...o, kind: doc })
     return roDocument(b, t, data.settings, v, { ...o, kind: doc })
   }, [doc, o, b, t, data, v, insp])
   // The preview iframe can't reach shopfile:// images under the srcdoc sandbox the same way, so photos show in the PDF.
@@ -114,10 +116,17 @@ export function PrintModal({ roId, initial, onClose }: { roId: number; initial: 
               <label className="check"><input type="checkbox" checked={o.partNumbers} onChange={(e) => setO({ ...o, partNumbers: e.target.checked })} />Show part numbers</label>
               <label className="check"><input type="checkbox" checked={o.laborHours} onChange={(e) => setO({ ...o, laborHours: e.target.checked })} />Show labor hours and rate</label>
               <label className="check"><input type="checkbox" checked={o.includeDeclined} onChange={(e) => setO({ ...o, includeDeclined: e.target.checked })} />Include declined jobs as "Recommended, not approved"</label>
-              <Field label="Message to customer"><textarea value={o.message} onChange={(e) => setO({ ...o, message: e.target.value })} /></Field>
+              {doc === 'invoice' && <Field label="Message to customer"><textarea value={o.message} onChange={(e) => setO({ ...o, message: e.target.value })} /></Field>}
             </>
           )}
-          <label className="check"><input type="checkbox" checked={o.stripes} onChange={(e) => setO({ ...o, stripes: e.target.checked })} />Stripe rule at the top</label>
+          {doc === 'estimate' && (
+            <>
+              <Field label="Additional notes"><textarea value={o.notes} onChange={(e) => setO({ ...o, notes: e.target.value })} /></Field>
+              <Field label="Repair urgency"><Seg options={['', 'urgent', 'regular'] as const} labels={{ '': 'Leave blank', urgent: 'Urgent', regular: 'Regular' }} value={o.urgency ?? ''} onChange={(urgency) => setO({ ...o, urgency })} /></Field>
+              <label className="check"><input type="checkbox" checked={!!o.customerCopy} onChange={(e) => setO({ ...o, customerCopy: e.target.checked })} />Add a customer copy (page 2)</label>
+            </>
+          )}
+          {doc !== 'estimate' && <label className="check"><input type="checkbox" checked={o.stripes} onChange={(e) => setO({ ...o, stripes: e.target.checked })} />Stripe rule at the top</label>}
           <p className="small muted" style={{ margin: 0 }}>Cost, profit, the verdict and the content score are never printed. Photos appear in the PDF and printout.</p>
         </div>
         <div className="doc-preview"><iframe title="Preview" srcDoc={html} sandbox="" /></div>

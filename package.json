@@ -1,8 +1,8 @@
 {
   "name": "wift",
-  "productName": "WIFT",
+  "productName": "Copper Calibration",
   "version": "1.0.0",
-  "description": "WIFT: shop management for a German-car repair shop (repair orders, inspections, scheduling, inventory, reports, Google Sheets export)",
+  "description": "Copper Calibration (built as WIFT): shop management for a German-car repair shop (repair orders, inspections, scheduling, inventory, reports, Google Sheets export)",
   "main": "out/main/index.js",
   "private": true,
   "scripts": {
@@ -15,7 +15,7 @@
   },
   "build": {
     "appId": "com.wift.app",
-    "productName": "WIFT",
+    "productName": "Copper Calibration",
     "directories": {
       "output": "dist"
     },
@@ -53,7 +53,7 @@
       "oneClick": false,
       "allowToChangeInstallationDirectory": true
     },
-    "artifactName": "${productName}-${version}-${os}-${arch}.${ext}"
+    "artifactName": "Copper-Calibration-${version}-${os}-${arch}.${ext}"
   },
   "dependencies": {
     "exceljs": "^4.4.0",

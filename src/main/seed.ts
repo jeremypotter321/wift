@@ -73,6 +73,8 @@ export function ensureDefaults() {
     if (!db.list('cannedJobs').length) {
       for (const c of CANNED) db.insert('cannedJobs', { name: c.name, category: c.category, intervalMonths: c.months, intervalMiles: c.miles, lines: c.lines })
     }
+    // Renamed to Copper Calibration (11-17): a shop still on the old placeholder name takes the new one.
+    if (db.getSettings().shopName === 'My Shop') db.saveSettings({ shopName: 'Copper Calibration' })
   })
 }
 

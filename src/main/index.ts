@@ -13,7 +13,9 @@ import { buildReport } from '../shared/report'
 import type { Settings, Snapshot } from '../shared/types'
 
 // A custom data folder (tests, demos) also gets its own browser storage, so the signed-in user etc. never leak between them.
+// The app was renamed WIFT → Copper Calibration (11-17). Keep the data folder at its WIFT path so nothing moves.
 if (process.env.SHOPBOARD_DATA_DIR) app.setPath('userData', path.resolve(process.env.SHOPBOARD_DATA_DIR))
+else app.setPath('userData', path.join(app.getPath('appData'), 'WIFT'))
 const dataDir = process.env.SHOPBOARD_DATA_DIR || app.getPath('userData')
 const photoDir = path.join(dataDir, 'photos')
 const docDir = path.join(dataDir, 'documents')
@@ -47,7 +49,35 @@ function snapshot(): Snapshot {
     reminders: db.list('reminders'),
     posts: db.list('posts'),
     googleConnected: g.isConnected(),
+    calendarAllowed: g.calendarAllowed(),
   }
+}
+async function pushCalendar(ids: number[]) {
+  const s = db.getSettings()
+  const vehicleName = (id: number | null) => { const v = id ? db.get('vehicles', id) : null; return v ? [v.year, v.make, v.model].filter(Boolean).join(' ') : '' }
+  const events = ids.map((id) => db.get('appointments', id)).filter((a): a is NonNullable<typeof a> => !!a && !!a.start).map((a) => {
+    const c = a.customerId ? db.get('customers', a.customerId) : null
+    const tech = a.userId ? db.get('users', a.userId)?.name : ''
+    const ro = a.roId ? db.get('ros', a.roId) : null
+    const car = vehicleName(a.vehicleId)
+    return {
+      apptId: a.id, cancelled: a.status === 'cancelled' || a.status === 'no-show',
+      summary: [c?.name, car, a.title].filter(Boolean).join(' · ') || 'Appointment',
+      description: [a.title && `For: ${a.title}`, car && `Car: ${car}`, c?.phone && `Phone: ${c.phone}`, tech && `Tech: ${tech}`, ro && `RO ${ro.number}`,
+        a.dropOff ? 'Dropping off' : 'Waiting', a.notes].filter(Boolean).join('\n'),
+      location: s.shopAddress, start: a.start, end: a.end,
+    }
+  })
+  return g.syncCalendar(events, { clientId: s.googleClientId, clientSecret: s.googleClientSecret, calendarId: s.googleCalendarId })
+}
+/** After an appointment is saved: copy it to Google Calendar in the background, when the shop turned that on. Failures are kept for Settings to show. */
+function autoSyncCalendar(ids: number[]) {
+  const s = db.getSettings()
+  if (!s.calendarSync || !g.isConnected()) return
+  pushCalendar(ids).then(
+    () => db.saveSettings({ calendarLastSync: new Date().toISOString(), calendarLastError: '' }),
+    (e: unknown) => db.saveSettings({ calendarLastError: e instanceof Error ? e.message : String(e) }),
+  )
 }
 const report = (from: string, to: string) => buildReport(snapshot(), from, to)
 const rangeLabel = (from: string, to: string) => `${from || 'start'}_to_${to || new Date().toISOString().slice(0, 10)}`
@@ -63,7 +93,11 @@ const GUARDED_DELETE: Partial<Record<EntityName, (id: number) => void>> = {
 /** Everything the renderer may call. Nothing outside this object is reachable over IPC. */
 const api = {
   snapshot,
-  save: <E extends EntityName>(entity: E, data: Partial<EntityTypes[E]> & { id?: number }) => db.upsert(assertEntity(entity) as E, data),
+  save: <E extends EntityName>(entity: E, data: Partial<EntityTypes[E]> & { id?: number }) => {
+    const saved = db.upsert(assertEntity(entity) as E, data)
+    if (entity === 'appointments') autoSyncCalendar([saved.id])
+    return saved
+  },
   saveMany: (items: { entity: EntityName; data: Record<string, unknown> & { id?: number } }[]) =>
     db.batch(() => items.map((i) => db.upsert(assertEntity(i.entity), i.data as never))),
   remove: (entity: EntityName, id: number) => {
@@ -84,6 +118,7 @@ const api = {
   punchIn: ops.punchIn,
   punchOut: ops.punchOut,
   createPo: ops.createPo,
+  orderPartsForRo: ops.orderPartsForRo,
   receivePo: ops.receivePo,
   startInspection: ops.startInspection,
   recommendJob: ops.recommendJob,
@@ -165,7 +200,7 @@ const api = {
   async pushSheets(from: string, to: string) {
     const s = db.getSettings()
     const res = await g.pushReport(report(from, to), {
-      clientId: s.googleClientId, clientSecret: s.googleClientSecret, spreadsheetId: s.googleSpreadsheetId, title: `${s.shopName}: WIFT accounting`,
+      clientId: s.googleClientId, clientSecret: s.googleClientSecret, spreadsheetId: s.googleSpreadsheetId, title: `${s.shopName}: accounting`,
     })
     if (res.spreadsheetId !== s.googleSpreadsheetId) db.saveSettings({ googleSpreadsheetId: res.spreadsheetId })
     return res
@@ -176,11 +211,18 @@ const api = {
     return true
   },
   googleDisconnect: () => g.disconnect(),
+  /** Copy every appointment from 30 days ago onward to Google Calendar (cancelled ones are removed). */
+  async syncCalendarNow() {
+    const from = new Date(Date.now() - 30 * 86_400_000).toISOString().slice(0, 10)
+    const res = await pushCalendar(db.list('appointments').filter((a) => a.start.slice(0, 10) >= from).map((a) => a.id))
+    db.saveSettings({ calendarLastSync: new Date().toISOString(), calendarLastError: '' })
+    return res
+  },
 
   async backupNow() {
     const r = await dialog.showSaveDialog(win!, {
-      defaultPath: path.join(app.getPath('documents'), `wift-backup-${new Date().toISOString().slice(0, 10)}.db`),
-      filters: [{ name: 'WIFT database', extensions: ['db'] }],
+      defaultPath: path.join(app.getPath('documents'), `copper-calibration-backup-${new Date().toISOString().slice(0, 10)}.db`),
+      filters: [{ name: 'Copper Calibration database', extensions: ['db'] }],
     })
     if (r.canceled || !r.filePath) return null
     db.save()
@@ -189,8 +231,8 @@ const api = {
   },
   async restore() {
     const r = await dialog.showOpenDialog(win!, {
-      title: 'Restore a WIFT backup', defaultPath: path.join(dataDir, 'backups'),
-      filters: [{ name: 'WIFT database', extensions: ['db'] }], properties: ['openFile'],
+      title: 'Restore a Copper Calibration backup', defaultPath: path.join(dataDir, 'backups'),
+      filters: [{ name: 'Copper Calibration database', extensions: ['db'] }], properties: ['openFile'],
     })
     if (r.canceled || !r.filePaths[0]) return false
     await db.restoreFrom(r.filePaths[0], dataDir)
@@ -223,7 +265,7 @@ ipcMain.handle('api', async (_e, method: string, args: unknown[]) => {
 
 function createWindow() {
   win = new BrowserWindow({
-    width: 1360, height: 860, minWidth: 1100, minHeight: 700, title: 'WIFT', backgroundColor: '#F8FAFC', show: false,
+    width: 1360, height: 860, minWidth: 1100, minHeight: 700, title: 'Copper Calibration', backgroundColor: '#F8FAFC', show: false,
     webPreferences: { preload: path.join(__dirname, '../preload/index.js'), contextIsolation: true, nodeIntegration: false, sandbox: true },
   })
   win.once('ready-to-show', () => {

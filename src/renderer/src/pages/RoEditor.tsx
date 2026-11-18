@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { useNav } from '../App'
 import { api } from '../api'
 import { useData } from '../store'
@@ -8,9 +8,9 @@ import {
 import { JobCard } from '../ro/JobCard'
 import { InspectionTab } from '../ro/InspectionTab'
 import { CannedPicker, CustomerPicker, PaymentModal, PrintModal, SignatureModal, VehicleModal } from '../ro/Modals'
-import { contentScore, hourlyTint, payState, verdict } from '../../../shared/calc'
+import { contentScore, hourlyTint, keywordContent, payState, verdict } from '../../../shared/calc'
 import { vehicleName } from '../../../shared/bundle'
-import { PLATFORMS, RO_STAGES, type RepairOrder } from '../../../shared/types'
+import { CONTENT_FACTORS, PLATFORMS, RO_STAGES, type ContentFactor, type RepairOrder } from '../../../shared/types'
 
 type Tab = 'jobs' | 'inspection' | 'payments' | 'notes' | 'content'
 type ModalKind = null | 'sign' | 'print-estimate' | 'print-invoice' | 'print-inspection' | 'pay' | 'customer' | 'vehicle' | 'canned'
@@ -126,14 +126,24 @@ export function RoEditor({ id, initialTab }: { id: number; initialTab?: string }
 
           {tab === 'jobs' && (
             <div>
-              <div className="card" style={{ marginBottom: 12, padding: 12 }}>
-                <label className="field">Customer concern<LazyText value={ro.concern} placeholder="What the customer says is wrong, in their words" onCommit={(concern) => save({ concern })} /></label>
+              <div className="card concern-card" style={{ marginBottom: 12, padding: 16 }}>
+                <label className="field">Customer concern<LazyText className="concern-input" value={ro.concern} placeholder="What the customer says is wrong, in their words" onCommit={(concern) => save({ concern })} /></label>
               </div>
               {b.jobs.length === 0 && <div className="card" style={{ marginBottom: 12 }}><Empty text="No jobs yet. Add a job or pick a canned job." /></div>}
               {b.jobs.map((j) => <JobCard key={j.id} job={j} lines={b.lines.filter((l) => l.jobId === j.id)} />)}
-              <div className="row">
+              <div className="row wrap">
                 <button className="btn" onClick={() => act(() => api.addJob(id, 'New job'))}>+ Add job</button>
                 <button className="btn" onClick={() => setModal('canned')}>Add canned job…</button>
+                {can.prices && <button className="btn" title={`Adds a Diagnosis job with the ${fmtMoney(s.diagnosisFee)} diagnosis fee (Settings ▸ Supplies & fees)`} onClick={async () => {
+                  const j = await act(() => api.addJob(id, 'Diagnosis'))
+                  if (j) await act(() => api.save('lines', { jobId: j.id, kind: 'fee', description: 'Diagnosis', qty: 1, price: s.diagnosisFee, taxable: false, sort: 0 }))
+                }}>+ Diagnosis ({fmtMoney(s.diagnosisFee, false)})</button>}
+                {can.prices && b.lines.some((l) => l.kind === 'part') && <button className="btn" title="Puts this RO's parts on draft purchase orders, one per vendor" onClick={async () => {
+                  const r = await act(() => api.orderPartsForRo(id))
+                  if (!r) return
+                  if (!r.pos.length) toast(r.skipped ? 'Every part on this RO is already on a purchase order' : 'No parts to order')
+                  else { toast(`${r.pos.length === 1 ? `PO ${r.pos[0].number}` : `${r.pos.length} purchase orders`} drafted for this RO's parts`); if (r.pos.length === 1) nav({ page: 'po', id: r.pos[0].id }) }
+                }}>Order parts</button>}
                 {ro.status !== 'estimate' && <span className="small muted">New jobs start as Pending and need the customer's approval.</span>}
               </div>
             </div>
@@ -286,17 +296,36 @@ function NotesTab({ roId }: { roId: number }) {
 }
 
 function ContentTab({ roId }: { roId: number }) {
-  const { data, act } = useData()
+  const { data, ix, act } = useData()
+  const roText = (rid: number) => {
+    const b = ix.bundle(rid)
+    const v = b.ro.vehicleId ? ix.vehicles.get(b.ro.vehicleId) : null
+    return [v && [v.year, v.make, v.model, v.trim, v.engine].join(' '), b.ro.concern, b.ro.notes, ...b.jobs.map((j) => `${j.title} ${j.notes}`), ...b.lines.map((l) => l.description)].filter(Boolean).join(' · ')
+  }
   const ro = data.ros.find((r) => r.id === roId)!
   const posts = data.posts.filter((p) => p.roId === roId)
   const [platform, setPlatform] = useState<string>(PLATFORMS[0])
   const [url, setUrl] = useState('')
+  const kw = keywordContent(roText(roId), data.settings)
+  const matched = (Object.entries(kw.hits) as [ContentFactor, string[]][]).filter(([, w]) => w.length)
+  // Settings ▸ Content keywords ▸ "Score automatically": an unscored RO takes the keyword score once.
+  useEffect(() => {
+    if (data.settings.contentAutoScore && contentScore(ro.content) === 0 && contentScore(kw.scores) > 0) void act(() => api.save('ros', { id: roId, content: kw.scores }))
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [roId])
   return (
     <div className="content-split">
       <div className="card">
         <div className="row between"><h2 style={{ margin: 0 }}>Content score</h2><b className="num" style={{ fontSize: 24 }}>{contentScore(ro.content)}/10</b></div>
         <p className="small muted">Would this job make a good TikTok / YouTube / Instagram post? A score of {data.settings.contentBumpScore}+ raises the take-it verdict a level.</p>
         <ContentEditor value={ro.content} onChange={(content) => act(() => api.save('ros', { id: roId, content }))} />
+        <div className="kw-box">
+          <div className="row between">
+            <b className="small">Keyword score: {contentScore(kw.scores)}/10</b>
+            <button className="btn sm" disabled={JSON.stringify(kw.scores) === JSON.stringify(ro.content)} onClick={() => act(() => api.save('ros', { id: roId, content: kw.scores }))}>Use keyword score</button>
+          </div>
+          <div className="small muted">{matched.length ? matched.map(([k, words]) => `${CONTENT_FACTORS[k]}: ${words.join(', ')}`).join(' · ') : 'No keywords matched. Edit the lists in Settings ▸ Content keywords.'}</div>
+        </div>
       </div>
       <div className="card flush">
         <div className="card-head"><h2>Posts</h2><span className="small muted num">{posts.reduce((a, p) => a + p.views, 0).toLocaleString()} views</span></div>

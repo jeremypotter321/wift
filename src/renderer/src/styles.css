@@ -202,7 +202,7 @@ td input, td select { height: 32px; font-size: 13px; }
 .job-head { min-height: 48px; display: flex; align-items: center; gap: 8px; padding: 6px 8px 6px 12px; border-bottom: 1px solid var(--divider); }
 .job-head input.title { border-color: transparent; font-size: 16px; font-weight: 600; height: 34px; padding: 0 6px; }
 .job-head input.title:hover { border-color: var(--divider); }
-.appr button.on.approved { background: var(--good); color: #fff; } .appr button.on.declined { background: var(--bg); color: var(--now); box-shadow: inset 0 0 0 2px var(--now); } .appr button.on.pending { background: var(--slate); color: #fff; }
+.appr button.on.opt-approved { background: var(--good); color: #fff; } .appr button.on.opt-declined { background: var(--bg); color: var(--now); box-shadow: inset 0 0 0 2px var(--now); } .appr button.on.opt-pending { background: var(--slate); color: #fff; }
 .lines { width: 100%; }
 .lines td { height: 40px; padding: 2px 6px; vertical-align: middle; }
 .lines td:first-child { padding-left: 12px; width: 28px; color: var(--text-2); }
@@ -335,3 +335,8 @@ table.inv { min-width: 980px; }
 table.inv th, table.inv td { padding-left: 8px; padding-right: 8px; }
 .new-more { display: flex; }
 .collapsed .new-more { display: none; }
+
+/* RO: the customer concern reads as the headline of the jobs tab (11-17). */
+.concern-card label.field { font-size: 14px; line-height: 20px; color: var(--text); font-weight: 650; gap: 8px; }
+textarea.autogrow.concern-input { min-height: 88px; font-size: 16px; line-height: 24px; padding: 10px 12px; font-weight: 400; }
+.kw-box { margin-top: 12px; padding: 10px 12px; border: 1px dashed var(--divider); border-radius: var(--r); display: grid; gap: 6px; }

@@ -3,11 +3,11 @@ import { api } from '../api'
 import { useData } from '../store'
 import { Avatar, confirmDialog, Field, fmtMoney, LazyInput, NumInput } from '../ui'
 import { matrixPrice } from '../../../shared/calc'
-import { ROLES, type InspectionTemplate, type MatrixTier, type Settings, type User } from '../../../shared/types'
+import { CONTENT_FACTORS, ROLES, type ContentFactor, type InspectionTemplate, type MatrixTier, type Settings, type User } from '../../../shared/types'
 
 const SECTIONS = [
   ['shop', 'Shop info'], ['labor', 'Labor rates'], ['matrix', 'Pricing matrix'], ['fees', 'Supplies & fees'], ['tax', 'Taxes'],
-  ['users', 'Users & roles'], ['templates', 'Inspection templates'], ['verdict', 'Verdict & content'], ['google', 'Google Sheets'], ['data', 'Backup & data'],
+  ['users', 'Users & roles'], ['templates', 'Inspection templates'], ['verdict', 'Verdict & content'], ['content', 'Content keywords'], ['google', 'Google Calendar'], ['data', 'Backup & data'],
 ] as const
 type Section = (typeof SECTIONS)[number][0]
 const COLORS = ['#1D4ED8', '#0F766E', '#6D28D9', '#B45309', '#B91C1C', '#334155']
@@ -37,6 +37,13 @@ export function SettingsPage() {
               <Field label="Address"><input value={s.shopAddress} onChange={(e) => set({ shopAddress: e.target.value })} /></Field>
               <div className="grid2"><Field label="Phone"><input value={s.shopPhone} onChange={(e) => set({ shopPhone: e.target.value })} /></Field><Field label="Email"><input value={s.shopEmail} onChange={(e) => set({ shopEmail: e.target.value })} /></Field></div>
               <Field label="Warranty / terms (printed at the bottom of documents)"><textarea value={s.invoiceTerms} onChange={(e) => set({ invoiceTerms: e.target.value })} /></Field>
+              <Field label="Estimate form: additional notes (pre-filled on every printed estimate)"><textarea value={s.estimateNotes} onChange={(e) => set({ estimateNotes: e.target.value })} /></Field>
+              <Field label="Estimate form: disclaimer line"><input value={s.estimateDisclaimer} onChange={(e) => set({ estimateDisclaimer: e.target.value })} /></Field>
+              <div className="grid3">
+                <Field label="Appointment calendar starts at"><select value={s.schedOpen} onChange={(e) => set({ schedOpen: Number(e.target.value), schedClose: Math.max(Number(e.target.value) + 1, s.schedClose) })}>{HOURS.slice(0, 24).map((h) => <option key={h} value={h}>{hourLabel(h)}</option>)}</select></Field>
+                <Field label="…and ends at"><select value={s.schedClose} onChange={(e) => set({ schedClose: Number(e.target.value) })}>{HOURS.filter((h) => h > s.schedOpen).map((h) => <option key={h} value={h}>{hourLabel(h)}</option>)}</select></Field>
+                <span />
+              </div>
               <div className="grid3">
                 <Field label="Next RO number"><NumInput value={s.nextRoNumber} step="1" onChange={(nextRoNumber) => set({ nextRoNumber })} /></Field>
                 <Field label="Reminder after (months without a visit)"><NumInput value={s.reminderMonths} step="1" onChange={(reminderMonths) => set({ reminderMonths })} /></Field>
@@ -106,6 +113,10 @@ export function SettingsPage() {
                 <Field label="Shop supplies (% of labor)"><NumInput value={s.shopSuppliesPct} onChange={(shopSuppliesPct) => set({ shopSuppliesPct })} /></Field>
                 <Field label="Cap per RO ($, 0 = no cap)"><NumInput prefix="$" value={s.shopSuppliesCap} onChange={(shopSuppliesCap) => set({ shopSuppliesCap })} /></Field>
               </div>
+              <div className="grid2">
+                <Field label="Diagnosis fee (added with “+ Diagnosis” on an RO)"><NumInput prefix="$" value={s.diagnosisFee} onChange={(diagnosisFee) => set({ diagnosisFee })} /></Field>
+                <span />
+              </div>
               <h3>Fee presets</h3>
               <table><thead><tr><th>Fee</th><th className="n">Amount</th><th>Taxable</th><th /></tr></thead>
                 <tbody>{s.feePresets.map((f, i) => (
@@ -144,6 +155,16 @@ export function SettingsPage() {
               <p className="small muted" style={{ margin: 0 }}>Take: projected $/hr at or above {fmtMoney(s.targetHourly, false)}. Maybe: down to {fmtMoney(s.targetHourly * (1 - s.maybeBandPct / 100), false)}. Pass: below that, or the job loses money. Each risk adds {s.riskPenaltyPct}% to the hours; 3+ risks drop a level; a content score of {s.contentBumpScore}+ raises a level.</p>
             </section>
           )}
+          {sec === 'content' && (
+            <section className="card stack">
+              <h2>Content keywords</h2>
+              <p className="small muted" style={{ margin: 0 }}>Scores a job's content potential from words in the car, the customer concern, the job names and notes. One matching keyword scores 1 (“Some”) for that factor, two or more score 2 (“Strong”). Separate keywords with commas.</p>
+              {(Object.keys(CONTENT_FACTORS) as ContentFactor[]).map((k) => (
+                <Field key={k} label={CONTENT_FACTORS[k]}><input value={s.contentKeywords[k] ?? ''} onChange={(e) => set({ contentKeywords: { ...s.contentKeywords, [k]: e.target.value } })} /></Field>
+              ))}
+              <label className="check"><input type="checkbox" checked={s.contentAutoScore} onChange={(e) => set({ contentAutoScore: e.target.checked })} />Score automatically: an RO with no content score yet takes the keyword score when its Content tab is opened</label>
+            </section>
+          )}
           {sec === 'google' && <GoogleSection s={s} set={set} dirty={dirty} />}
           {sec === 'data' && (
             <section className="card stack">
@@ -157,7 +178,7 @@ export function SettingsPage() {
               {data.ros.length === 0 && <div className="row"><button className="btn" onClick={() => act(() => api.loadSample())}>Load sample shop data</button><span className="small muted">Adds example customers, cars and repair orders to try things out.</span></div>}
             </section>
           )}
-          {['shop', 'labor', 'matrix', 'fees', 'tax', 'verdict', 'google'].includes(sec) && (
+          {['shop', 'labor', 'matrix', 'fees', 'tax', 'verdict', 'content', 'google'].includes(sec) && (
             <div className="savebar">
               {dirty && <span className="small muted" style={{ marginRight: 'auto', alignSelf: 'center' }}>Unsaved changes</span>}
               <button className="btn" disabled={!dirty} onClick={() => setS(data.settings)}>Discard</button>
@@ -169,6 +190,9 @@ export function SettingsPage() {
     </div>
   )
 }
+
+const HOURS = Array.from({ length: 25 }, (_, h) => h)
+const hourLabel = (h: number) => (h === 0 || h === 24 ? 'Midnight' : h === 12 ? 'Noon' : `${h % 12} ${h < 12 ? 'AM' : 'PM'}`)
 
 function checkMatrix(tiers: MatrixTier[]): string {
   if (!tiers.length) return 'Add at least one tier.'
@@ -203,7 +227,7 @@ function UsersSection() {
       </table>
       <button className="btn sm" style={{ alignSelf: 'flex-start' }} onClick={() => save({ name: 'New tech', role: 'tech', color: COLORS[data.users.length % COLORS.length] })}>+ Add user</button>
       <div className="small muted stack tight">
-        <span><b>Owner:</b> everything, including Settings, profit reports and the accountant export.</span>
+        <span><b>Owner:</b> everything, including Settings and profit reports.</span>
         <span><b>Advisor:</b> everything except Settings and profit reports.</span>
         <span><b>Tech:</b> job board, inspections and clocks. No prices, costs or profit.</span>
         <span>PINs are 4–6 digits and are asked when switching user or punching the time clock. Leave blank for no PIN. "Own cost" overrides the shop's tech cost for that person (0 = use the shop default).</span>
@@ -255,26 +279,40 @@ function TemplatesSection() {
 function GoogleSection({ s, set, dirty }: { s: Settings; set: (p: Partial<Settings>) => void; dirty: boolean }) {
   const { data, act, toast } = useData()
   const [connecting, setConnecting] = useState(false)
+  const [syncing, setSyncing] = useState(false)
   return (
     <section className="card stack">
-      <h2>Google Sheets</h2>
-      <p className="small muted" style={{ margin: 0 }}>One-time setup: create a Google OAuth client (Desktop app) and paste it here. Steps are in <code>docs/GOOGLE_SETUP.md</code>. The app can only see the spreadsheet it creates.</p>
+      <h2>Google Calendar</h2>
+      <p className="small muted" style={{ margin: 0 }}>Copies appointments to the shop's business Google Calendar: customer, car, what for, tech and RO number, at the shop's address. Editing or cancelling an appointment here updates or removes the event. Changes made in Google Calendar don't come back here.</p>
+      <p className="small muted" style={{ margin: 0 }}>One-time setup: create a Google OAuth client (Desktop app) with the Google Calendar API turned on, and paste it here. Steps are in <code>docs/GOOGLE_SETUP.md</code>. Sign in with the business Google account.</p>
       <div className="grid2">
         <Field label="Client ID"><input value={s.googleClientId} onChange={(e) => set({ googleClientId: e.target.value.trim() })} /></Field>
         <Field label="Client secret"><input type="password" value={s.googleClientSecret} onChange={(e) => set({ googleClientSecret: e.target.value.trim() })} /></Field>
       </div>
       <div className="row wrap">
         {data.googleConnected ? (
-          <><span className="pill p-green">Connected</span><button className="btn" onClick={() => act(() => api.googleDisconnect())}>Disconnect</button></>
+          <>{data.calendarAllowed ? <span className="pill p-green">Connected</span> : <span className="pill p-amber">Connected without Calendar access: disconnect and connect again</span>}
+            <button className="btn" onClick={() => act(() => api.googleDisconnect())}>Disconnect</button></>
         ) : (
           <><span className="pill p-slate">Not connected</span>
             <button className="btn primary" disabled={connecting || dirty || !s.googleClientId || !s.googleClientSecret} title={dirty ? 'Save settings first' : undefined}
               onClick={async () => { setConnecting(true); const ok = await act(() => api.googleConnect()); setConnecting(false); if (ok) toast('Connected to Google') }}>
               {connecting ? 'Waiting for Google sign-in in your browser…' : 'Connect Google account'}</button></>
         )}
-        {s.googleSpreadsheetId && <button className="btn" onClick={() => api.openLink(`https://docs.google.com/spreadsheets/d/${s.googleSpreadsheetId}/edit`)}>Open spreadsheet</button>}
       </div>
-      {s.googleSpreadsheetId && <Field label="Spreadsheet ID (clear it to start a new spreadsheet on the next push)"><input value={s.googleSpreadsheetId} onChange={(e) => set({ googleSpreadsheetId: e.target.value.trim() })} /></Field>}
+      <div className="grid2">
+        <Field label="Calendar ID"><input value={s.googleCalendarId} onChange={(e) => set({ googleCalendarId: e.target.value.trim() })} placeholder="primary" /></Field>
+        <span />
+      </div>
+      <p className="small muted" style={{ margin: 0 }}>“primary” is the account's main calendar. To use another calendar, paste its ID from Google Calendar ▸ that calendar's Settings ▸ Integrate calendar.</p>
+      <label className="check"><input type="checkbox" checked={s.calendarSync} onChange={(e) => set({ calendarSync: e.target.checked })} />Copy appointments to Google Calendar as they're saved</label>
+      <div className="row wrap">
+        <button className="btn" disabled={syncing || dirty || !data.googleConnected || !data.calendarAllowed} title={dirty ? 'Save settings first' : undefined}
+          onClick={async () => { setSyncing(true); const r = await act(() => api.syncCalendarNow()); setSyncing(false); if (r) toast(`Google Calendar: ${r.written} appointment${r.written === 1 ? '' : 's'} copied${r.removed ? `, ${r.removed} removed` : ''}`) }}>
+          {syncing ? 'Copying…' : 'Copy all appointments now'}</button>
+        <span className="small muted">{s.calendarLastSync ? `Last copied ${new Date(s.calendarLastSync).toLocaleString()}` : 'Not copied yet'}</span>
+      </div>
+      {s.calendarLastError && <div className="small neg">Last copy failed: {s.calendarLastError}</div>}
     </section>
   )
 }

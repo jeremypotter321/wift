@@ -1,5 +1,6 @@
 import { lineAmount, type RoBundle, type RoTotals } from '../../shared/calc'
-import { RATING_LABEL, type Inspection, type InspectionItem, type Settings, type Vehicle } from '../../shared/types'
+import { RATING_LABEL, type Inspection, type InspectionItem, type RoLine, type Settings, type Vehicle } from '../../shared/types'
+import logo from './assets/logo-full.png?inline'
 
 const esc = (s: unknown) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]!)
 const money = (n: number) => `${n < 0 ? '-' : ''}$${Math.abs(n).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
@@ -12,6 +13,10 @@ export interface DocOptions {
   includeDeclined: boolean
   message: string
   stripes: boolean
+  /** Estimate form only. */
+  notes?: string
+  urgency?: '' | 'urgent' | 'regular'
+  customerCopy?: boolean
 }
 
 const CSS = `
@@ -19,6 +24,7 @@ const CSS = `
   * { box-sizing: border-box; }
   body { font: 10pt/1.35 -apple-system, 'Segoe UI', Helvetica, Arial, sans-serif; color: #000; margin: 0; }
   .stripes { display: grid; gap: 2px; margin-bottom: 10px; } .stripes i { height: 2px; display: block; background: #000; } .stripes i:nth-child(2) { background: #555; } .stripes i:nth-child(3) { background: #999; }
+  header .logo { height: 0.85in; margin-right: 12px; } header .brand { display: flex; align-items: center; }
   header { display: flex; justify-content: space-between; align-items: flex-start; border-bottom: 1px solid #000; padding-bottom: 8px; margin-bottom: 12px; }
   .shop b { font-size: 16pt; display: block; } .title { text-align: right; } .title h1 { font-size: 20pt; margin: 0 0 2px; letter-spacing: 0.02em; }
   .two { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-bottom: 12px; }
@@ -47,7 +53,7 @@ const CSS = `
 
 function head(s: Settings, title: string, number: number, right: string[], stripes: boolean) {
   return `${stripes ? '<div class="stripes"><i></i><i></i><i></i></div>' : ''}<header>
-    <div class="shop"><b>${esc(s.shopName)}</b>${[s.shopAddress, s.shopPhone, s.shopEmail].filter(Boolean).map(esc).join('<br>')}</div>
+    <div class="brand"><img class="logo" src="${logo}" alt=""><div class="shop"><b>${esc(s.shopName)}</b>${[s.shopAddress, s.shopPhone, s.shopEmail].filter(Boolean).map(esc).join('<br>')}</div></div>
     <div class="title"><h1>${title}</h1><div>RO ${number}</div>${right.map((r) => `<div>${esc(r)}</div>`).join('')}</div></header>`
 }
 function parties(b: RoBundle, v: Vehicle | null) {
@@ -111,4 +117,102 @@ export function inspectionDocument(b: RoBundle, insp: Inspection, items: Inspect
     ${soon.length ? `<h2 class="section">! ${RATING_LABEL.soon}</h2>${detail(soon, '!', 'Soon')}` : ''}
     ${good.length ? `<h2 class="section">✓ Good</h2><div class="goods">${good.map((i) => `<div>✓ ${esc(i.name)}</div>`).join('')}</div>` : ''}
     <div class="terms">${esc(s.invoiceTerms)}</div></body></html>`
+}
+
+// ---------- Copper Calibration estimate form (their Canva template, 11-17) ----------
+const EF_CSS = `
+  @page { size: Letter; margin: 0.45in 0.5in; }
+  * { box-sizing: border-box; }
+  body { margin: 0; color: #000; font: 10.5pt/1.3 Montserrat, 'Avenir Next', 'Segoe UI', Helvetica, Arial, sans-serif; }
+  .ef { position: relative; }
+  .ef + .ef { break-before: page; }
+  .ef-head { display: flex; align-items: center; justify-content: space-between; border: 1.5px solid #000; border-radius: 0.6in; padding: 0.08in 0.3in 0.08in 0.45in; height: 1.1in; }
+  .ef-head h1 { margin: 0; font-size: 34pt; font-weight: 800; letter-spacing: 0.01em; }
+  .ef-head img { height: 0.92in; }
+  .ef-meta { margin: 0.16in 0 0 auto; width: 4.5in; display: grid; gap: 8px; }
+  .ef-line { display: flex; align-items: flex-end; gap: 8px; font-size: 11pt; }
+  .ef-line > span { white-space: nowrap; }
+  .ef-line > u { flex: 1; text-decoration: none; border-bottom: 1px solid #000; text-align: center; min-height: 18px; padding: 0 4px 1px; }
+  .ef-rule { border: 0; border-top: 2px solid #000; margin: 0.14in 0 0.18in; }
+  h3.ef-h { margin: 0 0 8px; font-size: 11.5pt; font-weight: 800; }
+  .ef-cust { display: grid; grid-template-columns: 1fr 0.85fr; column-gap: 0.45in; row-gap: 8px; }
+  .ef-cust .wide { grid-column: 1 / -1; }
+  table.ef-items { width: 100%; border-collapse: separate; border-spacing: 0; margin-top: 0.2in; border: 1.5px solid #000; border-radius: 14px; overflow: hidden; }
+  .ef-items th, .ef-items td { border-right: 1.5px solid #000; border-bottom: 1.5px solid #000; padding: 6px 8px; text-align: center; vertical-align: middle; }
+  .ef-items th:last-child, .ef-items td:last-child { border-right: 0; }
+  .ef-items tr:last-child td { border-bottom: 0; }
+  .ef-items th { font-weight: 800; font-size: 11pt; height: 0.4in; }
+  .ef-items td { height: 0.38in; font-size: 10.5pt; padding: 4px 8px; }
+  .ef-items tr { break-inside: avoid; }
+  .ef-items .no { width: 0.68in; } .ef-items .qty { width: 0.8in; } .ef-items .money { width: 1.5in; }
+  .ef-items tr.sub td.desc { font-size: 10pt; }
+  .ef-items .pn { display: block; font-size: 8pt; color: #333; }
+  .ef-items .muted { font-size: 8.5pt; color: #444; }
+  .ef-sums { margin: -1.5px 0 0 auto; width: 3.03in; border: 1.5px solid #000; border-top: 0; border-radius: 0 0 14px 14px; padding: 2px 16px 4px; break-inside: avoid; }
+  .ef-sums div { display: grid; grid-template-columns: 1fr 14px 1.2in; align-items: end; padding: 4px 0 2px; border-bottom: 1px solid #000; }
+  .ef-sums div:last-child { border-bottom: 0; } .ef-sums div > span:last-child { font-size: 12.5pt; } .ef-sums .grand span:first-child { font-weight: 800; }
+  .ef-sums span:last-child { text-align: center; }
+  .ef-bottom { display: grid; grid-template-columns: 1fr 1fr; gap: 0.5in; margin-top: 0.14in; break-inside: avoid; }
+  .ef-notes { border: 1.5px solid #000; min-height: 0.8in; padding: 8px 12px; text-align: center; white-space: pre-wrap; }
+  .ef-urg { display: flex; justify-content: space-between; margin: 6px 0 8px; padding-left: 4px; }
+  .ef-urg span { display: inline-flex; align-items: center; gap: 10px; font-size: 11pt; }
+  .ef-urg i { width: 22px; height: 22px; border: 1.5px solid #000; border-radius: 50%; display: inline-block; position: relative; }
+  .ef-urg i.on::after { content: ''; position: absolute; inset: 4px; background: #000; border-radius: 50%; }
+  .ef-disc { font-size: 10pt; }
+  .ef-sign { text-align: center; margin-top: 0.12in; break-inside: avoid; }
+  .ef-sign .u { text-decoration: underline; font-size: 11pt; }
+  .ef-sign .sigline { margin: 6px auto 0; width: 3.2in; padding-top: 4px; }
+  .ef-sign .dots { margin: 2px auto 0; width: 3.2in; border-bottom: 4px dotted #000; }
+  .ef-sign img { height: 0.6in; display: block; margin: 0 auto -4px; }
+`
+const efMoney = (n: number) => (Math.abs(n % 1) < 0.005 ? `${n < 0 ? '-' : ''}$${Math.abs(Math.round(n)).toLocaleString('en-US')}` : money(n))
+const pad2 = (n: number) => String(n).padStart(2, '0')
+const usDate = (d: string) => { if (!d) return ''; const x = new Date(d.length === 10 ? d + 'T12:00:00' : d); return `${x.getMonth() + 1}/${x.getDate()}/${x.getFullYear()}` }
+
+/**
+ * The shop's own estimate form: numbered jobs (01, 02…), with lettered sub-rows (01a, 01b…) when a job has several parts.
+ * Item rows carry parts, fees and sublet; labor is totalled once in the LABOR box. With customerCopy, page 2 repeats the
+ * form marked CUSTOMER COPY instead of the signature line.
+ */
+export function estimateForm(b: RoBundle, t: RoTotals, s: Settings, v: Vehicle | null, o: DocOptions): string {
+  const c = b.customer
+  const jobs = b.jobs.filter((j) => j.status !== 'declined' || o.includeDeclined)
+  const cell = (no: string, desc: string, qty: string, price: string, total: string, cls = '') =>
+    `<tr class="${cls}"><td class="no">${no}</td><td class="desc">${desc}</td><td class="qty">${qty}</td><td class="money">${price}</td><td class="money">${total}</td></tr>`
+  const lineDesc = (l: RoLine, fallback: string) => `${esc(l.description || fallback)}${o.partNumbers && l.partNumber ? `<span class="pn">#${esc(l.partNumber)}</span>` : ''}`
+  const rows = jobs.map((j, i) => {
+    const no = pad2(i + 1)
+    const all = b.lines.filter((l) => l.jobId === j.id)
+    const items = all.filter((l) => l.kind !== 'labor')
+    const laborH = all.filter((l) => l.kind === 'labor').reduce((a, l) => a + l.qty, 0)
+    const title = `${esc(j.title)}${j.status === 'declined' ? ' <span class="muted">(recommended, not approved)</span>' : ''}`
+    if (items.length === 0) return cell(no, title, o.laborHours && laborH ? `${laborH} h` : '', '', '<span class="muted">in labor</span>')
+    if (items.length === 1) { const l = items[0]; return cell(no, title, esc(l.qty), efMoney((l.kind === 'discount' ? -1 : 1) * l.price), efMoney(lineAmount(l))) }
+    return cell(no, title, '', '', efMoney(items.reduce((a, l) => a + lineAmount(l), 0))) +
+      items.map((l, k) => cell(no + String.fromCharCode(97 + (k % 26)), lineDesc(l, l.kind), esc(l.qty), efMoney((l.kind === 'discount' ? -1 : 1) * l.price), efMoney(lineAmount(l)), 'sub')).join('')
+  }).join('')
+  const subtotal = t.total - t.labor - t.supplies - t.tax
+  const sum = (label: string, n: number, cls = '') => `<div class="${cls}"><span>${label}</span><span>:</span><span>${efMoney(n)}</span></div>`
+  const sums = `<div class="ef-sums">${sum('SUBTOTAL', subtotal)}${sum('LABOR', t.labor)}${t.supplies ? sum('SHOP SUPPLIES', t.supplies) : ''}${t.tax ? sum('TAX', t.tax) : ''}${sum('TOTAL', t.total, 'grand')}</div>`
+  const car = v ? [v.year, v.make, v.model, v.trim].filter(Boolean).join(' ') : ''
+  const line = (label: string, value: string, cls = '') => `<div class="ef-line ${cls}"><span>${label}</span><u>${esc(value)}</u></div>`
+  const page = (copy: boolean) => `<section class="ef">
+    <div class="ef-head"><h1>ESTIMATE FORM</h1><img src="${logo}" alt="${esc(s.shopName)}"></div>
+    <div class="ef-meta">${line('WORK NO :', String(b.ro.number).padStart(4, '0'))}${line('DATE :', usDate(b.ro.createdAt))}</div>
+    <hr class="ef-rule">
+    <h3 class="ef-h">CUSTOMER INFORMATION</h3>
+    <div class="ef-cust">${line('NAME :', c?.name ?? '')}${line('PHONE NO :', c?.phone ?? '')}${line('CAR:', car)}${line('EMAIL :', c?.email ?? '')}${line('ADDRESS :', c?.address ?? '', 'wide')}</div>
+    <table class="ef-items"><thead><tr><th class="no">NO</th><th>ITEM DESCRIPTION</th><th class="qty">QTY</th><th class="money">PRICE</th><th class="money">TOTAL</th></tr></thead>
+      <tbody>${rows || cell('', 'No items yet', '', '', '')}</tbody></table>
+    ${sums}
+    <div class="ef-bottom">
+      <div><h3 class="ef-h">ADDITIONAL NOTES :</h3><div class="ef-notes">${esc(o.notes ?? '')}</div></div>
+      <div><h3 class="ef-h">REPAIR URGENCY :</h3>
+        <div class="ef-urg"><span><i class="${o.urgency === 'urgent' ? 'on' : ''}"></i>URGENT</span><span><i class="${o.urgency === 'regular' ? 'on' : ''}"></i>REGULAR</span></div>
+        <div class="ef-disc">${esc(s.estimateDisclaimer)}</div></div>
+    </div>
+    <div class="ef-sign">${copy ? '<div class="u" style="margin-top:0.25in">CUSTOMER COPY</div>' : `<div class="u">CUSTOMER SIGNATURE</div>
+      <div class="sigline">${b.ro.signature ? `<img src="${b.ro.signature}" alt="">` : ''}SIGNATURE${b.ro.signature ? ` · ${esc(b.ro.authorizedBy)} · ${esc(usDate(b.ro.authorizedAt))}` : ''}</div><div class="dots"></div>`}</div>
+  </section>`
+  return `<!doctype html><html><head><meta charset="utf-8"><style>${EF_CSS}</style></head><body>${page(false)}${o.customerCopy ? page(true) : ''}</body></html>`
 }

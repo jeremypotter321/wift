@@ -106,10 +106,9 @@ for (const [w, h] of [[1360, 860], [1100, 700]]) {
   await page.click('[role=tab]:has-text("Payments received")'); await check(`${sz} payments`)
   await nav('Reports')
   for (const r of ['Overview', 'End of day', 'Sales', 'Gross profit', 'Close ratio', 'Declined jobs', 'Tech productivity', 'Content performance']) { await page.click(`.sec-link:has-text("${r}")`); await check(`${sz} report ${r}`) }
-  await nav('Accountant export'); await check(`${sz} export`)
   await nav('Canned jobs'); await check(`${sz} canned`)
   await nav('Settings')
-  for (const s of ['Shop info', 'Labor rates', 'Pricing matrix', 'Supplies', 'Taxes', 'Users', 'Inspection templates', 'Verdict', 'Google', 'Backup']) { await page.click(`.sec-link:has-text("${s}")`); await check(`${sz} settings ${s}`) }
+  for (const s of ['Shop info', 'Labor rates', 'Pricing matrix', 'Supplies', 'Taxes', 'Users', 'Inspection templates', 'Verdict', 'Content keywords', 'Google', 'Backup']) { await page.click(`.sec-link:has-text("${s}")`); await check(`${sz} settings ${s}`) }
   await page.keyboard.press('Meta+k'); await page.keyboard.type('bmw'); await check(`${sz} search`); await esc()
   await page.click('.user-chip'); await check(`${sz} switch user`); await esc()
 }

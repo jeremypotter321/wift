@@ -74,10 +74,21 @@ export interface Settings {
   googleClientId: string
   googleClientSecret: string
   googleSpreadsheetId: string
+  diagnosisFee: number // flat diagnosis charge, added with "+ Diagnosis"
+  schedOpen: number // first hour shown on the appointment calendar (0–23)
+  schedClose: number // hour the calendar ends (1–24)
+  contentKeywords: Record<ContentFactor, string> // comma-separated keywords per content factor
+  contentAutoScore: boolean // fill an unscored RO's content score from the keywords
+  estimateNotes: string // "Additional notes" box on the printed estimate
+  estimateDisclaimer: string // line under "Repair urgency" on the printed estimate
+  googleCalendarId: string // calendar appointments are copied to ('primary' = the account's main calendar)
+  calendarSync: boolean // copy appointments to Google Calendar as they're saved
+  calendarLastSync: string // ISO time of the last successful copy
+  calendarLastError: string // last copy failure, shown in Settings
 }
 
 export const DEFAULT_SETTINGS: Settings = {
-  shopName: 'My Shop',
+  shopName: 'Copper Calibration',
   shopAddress: '',
   shopPhone: '',
   shopEmail: '',
@@ -116,6 +127,23 @@ export const DEFAULT_SETTINGS: Settings = {
   googleClientId: '',
   googleClientSecret: '',
   googleSpreadsheetId: '',
+  diagnosisFee: 100,
+  schedOpen: 6,
+  schedClose: 21,
+  contentKeywords: {
+    rarity: 'M3, M5, M2, 1M, Alpina, Porsche, GT3, E30, E46 M3, classic, vintage, rare, limited',
+    transformation: 'restoration, rebuild, swap, conversion, widebody, rust repair, full build, big turbo, single turbo',
+    story: 'project, first car, inherited, barn find, salvage, track, race, rescue, comeback, gave up',
+    satisfying: 'walnut blast, carbon clean, teardown, timing, engine rebuild, valve, detail, polish',
+    trend: 'E85, flex fuel, N54, N55, B58, S55, downpipe, tune, dyno, launch control, pops',
+  },
+  contentAutoScore: true,
+  estimateNotes: 'Labor subject to change due to labor conditions and hours spent on job.',
+  estimateDisclaimer: 'By agreeing to the estimate, you hereby agree to the Copper Calibration liability disclaimer.',
+  googleCalendarId: 'primary',
+  calendarSync: false,
+  calendarLastSync: '',
+  calendarLastError: '',
 }
 
 // ---------- people ----------
@@ -412,4 +440,5 @@ export interface Snapshot {
   reminders: Reminder[]
   posts: ContentPost[]
   googleConnected: boolean
+  calendarAllowed: boolean
 }

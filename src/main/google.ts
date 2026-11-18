@@ -6,8 +6,12 @@ import { safeStorage, shell } from 'electron'
 import { google, type sheets_v4 } from 'googleapis'
 import type { Report, Table } from '../shared/report'
 
-/** drive.file: the app can only see spreadsheets it created itself. */
-const SCOPES = ['https://www.googleapis.com/auth/drive.file']
+/**
+ * drive.file: the app can only see spreadsheets it created itself.
+ * calendar.events: add, change and remove events (appointments) on the shop's calendar; it can't change calendar settings or sharing.
+ */
+const CALENDAR_SCOPE = 'https://www.googleapis.com/auth/calendar.events'
+const SCOPES = ['https://www.googleapis.com/auth/drive.file', CALENDAR_SCOPE]
 let tokenFile = ''
 
 export function initGoogle(dataDir: string) {
@@ -29,6 +33,8 @@ function writeToken(t: unknown) {
 }
 
 export const isConnected = () => readToken() != null
+/** Tokens from before Calendar was added (11-17) don't carry the calendar scope: the shop has to reconnect once. */
+export const calendarAllowed = () => String(readToken()?.scope ?? '').includes(CALENDAR_SCOPE)
 export function disconnect() {
   if (fs.existsSync(tokenFile)) fs.rmSync(tokenFile)
 }
@@ -57,7 +63,7 @@ export async function connect(clientId: string, clientSecret: string): Promise<v
         return
       }
       res.writeHead(200, { 'Content-Type': 'text/html' })
-      res.end(`<html><body style="font-family:system-ui;padding:40px"><h2>${err ? 'Google sign-in was cancelled.' : 'WIFT is connected to Google.'}</h2><p>You can close this tab and go back to WIFT.</p></body></html>`)
+      res.end(`<html><body style="font-family:system-ui;padding:40px"><h2>${err ? 'Google sign-in was cancelled.' : 'Copper Calibration is connected to Google.'}</h2><p>You can close this tab and go back to Copper Calibration.</p></body></html>`)
       clearTimeout(timer)
       if (err) reject(new Error(`Google sign-in failed: ${err}`))
       else resolve(c!)
@@ -69,13 +75,65 @@ export async function connect(clientId: string, clientSecret: string): Promise<v
   writeToken(tokens)
 }
 
-function client(clientId: string, clientSecret: string) {
+function authClient(clientId: string, clientSecret: string) {
   const token = readToken()
   if (!token) throw new Error('Not connected to Google. Connect in Settings.')
   const auth = new google.auth.OAuth2(clientId, clientSecret)
   auth.setCredentials(token)
   auth.on('tokens', (t) => writeToken({ ...token, ...t }))
-  return google.sheets({ version: 'v4', auth })
+  return auth
+}
+const client = (clientId: string, clientSecret: string) => google.sheets({ version: 'v4', auth: authClient(clientId, clientSecret) })
+
+// ---------- Google Calendar: appointments → the shop's business calendar ----------
+export interface CalendarEvent {
+  apptId: number
+  cancelled: boolean
+  summary: string
+  description: string
+  location: string
+  start: string // local "YYYY-MM-DDTHH:mm"
+  end: string
+}
+/** Event ids must be base32hex (0-9, a-v): derive one from the appointment id so an appointment always maps to the same event. */
+export const eventId = (apptId: number) => `ccappt${apptId}`
+
+/**
+ * Create, update or remove each appointment's event. Upsert by the fixed event id: update first, insert on 404.
+ * (Updating a deleted event brings it back, so a re-booked appointment reuses its id.)
+ */
+export async function syncCalendar(events: CalendarEvent[], opts: { clientId: string; clientSecret: string; calendarId: string }) {
+  if (!calendarAllowed()) throw new Error('Google is connected without Calendar access. Disconnect and connect again in Settings ▸ Google to allow Calendar.')
+  const cal = google.calendar({ version: 'v3', auth: authClient(opts.clientId, opts.clientSecret) })
+  const calendarId = opts.calendarId || 'primary'
+  const timeZone = Intl.DateTimeFormat().resolvedOptions().timeZone
+  const code = (e: unknown) => (e as { code?: number; status?: number }).code ?? (e as { status?: number }).status
+  let written = 0
+  let removed = 0
+  for (const ev of events) {
+    const id = eventId(ev.apptId)
+    if (ev.cancelled) {
+      try {
+        await cal.events.delete({ calendarId, eventId: id })
+        removed++
+      } catch (e) {
+        if (code(e) !== 404 && code(e) !== 410) throw e
+      }
+      continue
+    }
+    const body = {
+      id, summary: ev.summary, description: ev.description, location: ev.location, status: 'confirmed',
+      start: { dateTime: `${ev.start}:00`, timeZone }, end: { dateTime: `${(ev.end || ev.start)}:00`, timeZone },
+    }
+    try {
+      await cal.events.update({ calendarId, eventId: id, requestBody: body })
+    } catch (e) {
+      if (code(e) !== 404) throw e
+      await cal.events.insert({ calendarId, requestBody: body })
+    }
+    written++
+  }
+  return { written, removed }
 }
 
 const SHEET_FMT: Partial<Record<Table['formats'][number], sheets_v4.Schema$NumberFormat>> = {

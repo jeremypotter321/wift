@@ -16,7 +16,6 @@ import { PurchaseOrders, PoDetail } from './pages/PurchaseOrders'
 import { Vendors } from './pages/Vendors'
 import { Payments } from './pages/Payments'
 import { Reports } from './pages/Reports'
-import { ExportPage } from './pages/Export'
 import { CannedJobs } from './pages/CannedJobs'
 import { SettingsPage } from './pages/Settings'
 import type { User } from '../../shared/types'
@@ -25,7 +24,7 @@ export type Route =
   | { page: 'dashboard' } | { page: 'board'; view?: 'stage' | 'tech' } | { page: 'appointments' } | { page: 'timeclock' }
   | { page: 'customers' } | { page: 'customer'; id: number } | { page: 'vehicle'; id: number } | { page: 'reminders' }
   | { page: 'inventory' } | { page: 'pos' } | { page: 'po'; id: number } | { page: 'vendors' }
-  | { page: 'payments' } | { page: 'reports' } | { page: 'export' } | { page: 'canned' } | { page: 'settings' }
+  | { page: 'payments' } | { page: 'reports' } | { page: 'canned' } | { page: 'settings' }
   | { page: 'ro'; id: number; tab?: string }
 
 const NavCtx = createContext<(r: Route) => void>(() => {})
@@ -42,7 +41,6 @@ const NAV: { group?: string; items: NavItem[] }[] = [
     items: [
       { page: 'payments', label: 'Payments & A/R', icon: '$', hide: (u) => u?.role === 'tech' },
       { page: 'reports', label: 'Reports', icon: '▮', hide: (u) => u?.role === 'tech' },
-      { page: 'export', label: 'Accountant export', icon: '⇪', hide: (u) => u?.role !== 'owner' },
     ],
   },
   { group: 'Library', items: [{ page: 'canned', label: 'Canned jobs', icon: '❒' }] },
@@ -95,7 +93,7 @@ export function App() {
         <nav className="sidebar" aria-label="Main">
           <div className="sb-logo">
             <img src="./icon.png" alt="" />
-            <span><b>WIFT</b><small className="ellipsis">{data.settings.shopName}</small></span>
+            <span><b>Copper Calibration</b>{data.settings.shopName !== 'Copper Calibration' && <small className="ellipsis">{data.settings.shopName}</small>}</span>
           </div>
           <div className="stripes" aria-hidden><i /><i /><i /></div>
           {user?.role !== 'tech' && (
@@ -173,7 +171,6 @@ function Page({ route }: { route: Route }) {
     case 'vendors': return <Vendors />
     case 'payments': return can.payments ? <Payments /> : <NoAccess />
     case 'reports': return can.payments ? <Reports /> : <NoAccess />
-    case 'export': return can.settings ? <ExportPage /> : <NoAccess />
     case 'canned': return <CannedJobs />
     case 'settings': return can.settings ? <SettingsPage /> : <NoAccess />
   }

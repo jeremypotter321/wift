@@ -1,4 +1,4 @@
-import { matrixPrice, laborRate, round2 } from '../shared/calc'
+import { countsToward, matrixPrice, laborRate, round2 } from '../shared/calc'
 import type { JobStatus, RoStatus } from '../shared/types'
 import * as db from './db'
 
@@ -188,6 +188,32 @@ export function createPo(vendorId: number | null, roId: number | null = null) {
     const po = db.insert('pos', { number: s.nextPoNumber, vendorId, roId })
     db.saveSettings({ nextPoNumber: s.nextPoNumber + 1 })
     return po
+  })
+}
+/**
+ * Order the parts on an RO: one draft PO per vendor (no vendor = one PO with no vendor), linked to the RO.
+ * Skips jobs the RO total doesn't count (declined, or not yet approved once work started) and any part already on a PO for this RO (same part # or, without one, same description).
+ */
+export function orderPartsForRo(roId: number) {
+  return db.batch(() => {
+    const ro = db.get('ros', roId)
+    if (!ro) throw new Error('Repair order not found')
+    // Same jobs the RO total counts: everything not declined on an estimate, approved work once it's in progress.
+    const jobs = db.list('jobs', 'ro_id = ?', [roId]).filter((j) => countsToward(ro, j))
+    const parts = jobs.flatMap((j) => db.list('lines', 'job_id = ?', [j.id])).filter((l) => l.kind === 'part' && l.qty > 0 && (l.partNumber || l.description))
+    const ordered = db.list('pos', 'ro_id = ?', [roId]).filter((p) => p.status !== 'cancelled').flatMap((p) => db.list('poLines', 'po_id = ?', [p.id]))
+    const key = (x: { partNumber: string; description: string }) => (x.partNumber ? `#${x.partNumber.trim().toLowerCase()}` : x.description.trim().toLowerCase())
+    const have = new Set(ordered.map(key))
+    const todo = parts.filter((l) => !have.has(key(l)))
+    const byVendor = new Map<number | null, typeof todo>()
+    for (const l of todo) byVendor.set(l.vendorId, [...(byVendor.get(l.vendorId) ?? []), l])
+    const pos = [...byVendor].map(([vendorId, lines]) => {
+      const po = createPo(vendorId, roId)
+      for (const l of lines) db.insert('poLines', { poId: po.id, inventoryPartId: l.inventoryPartId, partNumber: l.partNumber, description: l.description, qty: l.qty, cost: l.cost })
+      return po
+    })
+    if (pos.length && ro.status === 'wip' && ro.stage === 'In progress') db.update('ros', roId, { stage: 'Waiting on parts' })
+    return { pos, skipped: parts.length - todo.length }
   })
 }
 /** Receive quantities per PO line. Stock goes up; lines without an inventory part get one created. */

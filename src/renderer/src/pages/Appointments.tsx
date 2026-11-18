@@ -6,7 +6,7 @@ import { confirmDialog, Field, fmtTime, localDate, Modal, RoPill, Seg, todayIso 
 import { vehicleName } from '../../../shared/bundle'
 import type { Appointment } from '../../../shared/types'
 
-const OPEN = 7, CLOSE = 18, HOUR_PX = 48
+const HOUR_PX = 48
 const toLocal = (d: Date) => `${localDate(d)}T${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`
 const addDays = (iso: string, n: number) => { const d = new Date(iso + 'T12:00:00'); d.setDate(d.getDate() + n); return localDate(d) }
 const startOfWeek = (iso: string) => { const d = new Date(iso + 'T12:00:00'); d.setDate(d.getDate() - ((d.getDay() + 6) % 7)); return localDate(d) }
@@ -23,6 +23,11 @@ export function Appointments() {
   useEffect(() => { const t = setInterval(() => setNow(new Date()), 60_000); return () => clearInterval(t) }, [])
 
   const appts = data.appointments.filter((a) => a.status !== 'cancelled')
+  // Calendar hours come from Settings ▸ Shop info, stretched to fit any appointment booked outside them.
+  const s = data.settings
+  const shown = view === 'day' ? appts.filter((a) => a.start.slice(0, 10) === day) : view === 'week' ? appts.filter((a) => { const d = a.start.slice(0, 10); const ws = startOfWeek(day); return d >= ws && d <= addDays(ws, 6) }) : []
+  const OPEN = Math.max(0, Math.min(23, Math.floor(Math.min(s.schedOpen, ...shown.map((a) => hourOf(a.start))))))
+  const CLOSE = Math.max(OPEN + 1, Math.min(24, Math.ceil(Math.max(s.schedClose, ...shown.map((a) => hourOf(a.end || a.start))))))
   const techs = data.users.filter((u) => u.active && u.role !== 'advisor')
   const step = view === 'day' ? 1 : view === 'week' ? 7 : 30
   const label = view === 'day' ? new Date(day + 'T12:00:00').toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' })
@@ -52,7 +57,7 @@ export function Appointments() {
     <div className="cal" style={{ gridTemplateColumns: `56px repeat(${cols.length}, minmax(140px, 1fr))` }}>
       <div className="cal-head" />
       {cols.map((c) => <div key={c.key} className="cal-head">{c.title}<div className="small muted" style={{ fontWeight: 400 }}>{c.list.length} booked</div></div>)}
-      <div>{hours.map((h) => <div key={h} className="cal-time" style={{ height: HOUR_PX }}>{h > 12 ? h - 12 : h} {h >= 12 ? 'PM' : 'AM'}</div>)}</div>
+      <div>{hours.map((h) => <div key={h} className="cal-time" style={{ height: HOUR_PX }}>{h % 12 === 0 ? 12 : h % 12} {h >= 12 ? 'PM' : 'AM'}</div>)}</div>
       {cols.map((c) => (
         <div key={c.key} className="cal-col">
           {hours.map((h) => <div key={h} className="cal-slot" onClick={() => newAt(c.date, h, c.userId)} aria-label={`New appointment ${c.title} ${h}:00`} />)}
@@ -109,6 +114,11 @@ export function Appointments() {
         <b>{label}</b>
         <Seg options={['day', 'week', 'month'] as const} labels={{ day: 'Day', week: 'Week', month: 'Month' }} value={view} onChange={setView} />
         <span className="grow" />
+        {s.calendarSync && data.googleConnected && (
+          <span className={`pill ${s.calendarLastError ? 'p-red' : 'p-green'}`} title={s.calendarLastError || (s.calendarLastSync ? `Last copied ${new Date(s.calendarLastSync).toLocaleString()}` : '')}>
+            {s.calendarLastError ? 'Google Calendar: not syncing' : 'Google Calendar on'}
+          </span>
+        )}
         <button className="btn sm" onClick={() => setDrawer(!drawer)}>{drawer ? 'Hide' : 'Show'} unscheduled ({unscheduled.length})</button>
         <button className="btn primary" onClick={() => newAt(day, 9, null)}>+ Appointment</button>
       </div>

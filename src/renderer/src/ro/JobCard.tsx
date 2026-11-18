@@ -66,6 +66,7 @@ export function JobCard({ job, lines }: { job: RoJob; lines: RoLine[] }) {
             <button className="btn ghost sm" onClick={() => setPicking(true)}>+ Part</button>
             <button className="btn ghost sm" onClick={() => addLine('fee', { description: s.feePresets[0]?.name ?? 'Fee', price: s.feePresets[0]?.amount ?? 0, taxable: s.feePresets[0]?.taxable ?? false })}>+ Fee</button>
             <button className="btn ghost sm" onClick={() => addLine('sublet', { description: 'Sublet' })}>+ Sublet</button>
+            {can.prices && <button className="btn ghost sm" title="Diagnosis fee from Settings ▸ Supplies & fees" onClick={() => addLine('fee', { description: 'Diagnosis', price: s.diagnosisFee, taxable: false })}>+ Diagnosis</button>}
             {can.prices && <button className="btn ghost sm" onClick={() => addLine('discount', { description: 'Discount', taxable: false })}>+ Discount</button>}
             <span className="grow" />
             {can.prices && lines.length > 0 && <span className="small muted">{lines.filter((l) => l.kind === 'labor').reduce((a, l) => a + l.qty, 0)} h sold</span>}

@@ -98,7 +98,7 @@ export function Seg<T extends string | number>({ options, value, onChange, label
   return (
     <div className={`seg ${className ?? ''}`} role="radiogroup">
       {options.map((o) => (
-        <button key={String(o)} type="button" role="radio" aria-checked={o === value} className={`${o === value ? 'on' : ''} ${String(o)}`} onClick={() => onChange(o)}>
+        <button key={String(o)} type="button" role="radio" aria-checked={o === value} className={`${o === value ? 'on' : ''} opt-${String(o)}`} onClick={() => onChange(o)}>
           {labels?.[String(o)] ?? String(o)}
         </button>
       ))}
