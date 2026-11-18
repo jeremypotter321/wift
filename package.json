@@ -1,7 +1,7 @@
 {
   "name": "wift",
   "productName": "Copper Calibration",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "description": "Copper Calibration (built as WIFT): shop management for a German-car repair shop (repair orders, inspections, scheduling, inventory, reports, Google Sheets export)",
   "main": "out/main/index.js",
   "private": true,
